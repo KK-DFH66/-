@@ -123,7 +123,7 @@ button:disabled {
 }
 
 /* 计时器样式 */
-#timer-display {
+#timer-display, #review-timer-display {
     position: fixed;
     top: 20px;
     right: 20px;
@@ -135,7 +135,7 @@ button:disabled {
     z-index: 100;
 }
 
-#timer-display.blink {
+#timer-display.blink, #review-timer-display.blink {
     animation: blink 1s infinite;
 }
 
@@ -154,20 +154,25 @@ button:disabled {
 }
 
 .preview-item {
-    background: white;
     padding: 15px;
     margin-bottom: 15px;
     border-radius: 8px;
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    border-left: 4px solid #3498db;
+    transition: all 0.3s;
 }
 
 .preview-item.unanswered {
-    border-left-color: #f1c40f;
+    background-color: #fff8e1;
+    border-left: 4px solid #ffc107;
+}
+
+.preview-item:not(.unanswered) {
+    background-color: #ffffff;
+    border-left: 4px solid #4CAF50;
 }
 
 .unanswered-tag {
-    background-color: #f1c40f;
+    background-color: #ffc107;
     color: white;
     padding: 2px 8px;
     border-radius: 4px;
@@ -258,7 +263,7 @@ button:disabled {
         padding: 15px;
     }
     
-    #timer-display {
+    #timer-display, #review-timer-display {
         position: static;
         margin-bottom: 15px;
         text-align: center;
