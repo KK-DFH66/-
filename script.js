@@ -72,6 +72,7 @@ function startExam() {
     // 清除旧计时器
     clearInterval(examTimer);
     document.getElementById('timer-display')?.remove();
+    document.getElementById('review-timer-display')?.remove();
     
     startScreen.classList.add('hidden');
     examScreen.classList.remove('hidden');
@@ -91,20 +92,31 @@ function startExam() {
 
 // 启动计时器
 function startTimer() {
+    // 考试界面计时器
     const timerDisplay = document.createElement('div');
     timerDisplay.id = 'timer-display';
     examScreen.insertBefore(timerDisplay, document.querySelector('.question-container'));
+
+    // 预览界面计时器
+    const reviewTimerDisplay = document.createElement('div');
+    reviewTimerDisplay.id = 'review-timer-display';
+    reviewScreen.insertBefore(reviewTimerDisplay, document.querySelector('.preview-container'));
 
     examTimer = setInterval(() => {
         examTimeLeft--;
         const minutes = Math.floor(examTimeLeft / 60);
         const seconds = examTimeLeft % 60;
-        timerDisplay.innerHTML = `剩余时间: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+        const timeString = `剩余时间: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+        
+        timerDisplay.innerHTML = timeString;
+        reviewTimerDisplay.innerHTML = timeString;
         
         // 最后5分钟红色警示
         if (examTimeLeft <= 5 * 60) {
             timerDisplay.style.color = '#e74c3c';
             timerDisplay.classList.add('blink');
+            reviewTimerDisplay.style.color = '#e74c3c';
+            reviewTimerDisplay.classList.add('blink');
         }
         
         // 时间结束自动交卷
@@ -221,8 +233,14 @@ function showPreview() {
         const userAnswer = userAnswers[index];
         const isAnswered = userAnswer !== null;
 
+        // 添加未作答高亮样式
         if (!isAnswered) {
             previewItem.classList.add('unanswered');
+            previewItem.style.backgroundColor = '#fff8e1'; // 浅黄色背景
+            previewItem.style.borderLeft = '4px solid #ffc107'; // 橙色左侧边框
+        } else {
+            previewItem.style.backgroundColor = '#ffffff'; // 白色背景
+            previewItem.style.borderLeft = '4px solid #4CAF50'; // 绿色左侧边框
         }
 
         previewItem.innerHTML = `
