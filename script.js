@@ -4,6 +4,9 @@ let currentExam = [];
 let currentQuestionIndex = 0;
 let userAnswers = [];
 let score = 0;
+let examTimer;
+let examTimeLeft = 60 * 60; // 60分钟倒计时（单位：秒）
+let canSubmit = false; // 是否允许交卷
 
 // DOM元素
 const startScreen = document.getElementById('start-screen');
@@ -42,7 +45,7 @@ async function init() {
         startBtn.addEventListener('click', startExam);
         prevBtn.addEventListener('click', showPreviousQuestion);
         nextBtn.addEventListener('click', showNextQuestion);
-        submitBtn.addEventListener('click', showResult);
+        submitBtn.addEventListener('click', handleSubmit);
         viewWrongBtn.addEventListener('click', showWrongAnswers);
         newExamBtn.addEventListener('click', startExam);
         backToResultBtn.addEventListener('click', () => {
@@ -62,7 +65,13 @@ function startExam() {
     currentQuestionIndex = 0;
     userAnswers = [];
     score = 0;
+    examTimeLeft = 60 * 60; // 重置倒计时
+    canSubmit = false; // 重置交卷权限
     generateRandomExam();
+    
+    // 清除旧计时器
+    clearInterval(examTimer);
+    document.getElementById('timer-display')?.remove();
     
     startScreen.classList.add('hidden');
     examScreen.classList.remove('hidden');
@@ -70,30 +79,56 @@ function startExam() {
     resultScreen.classList.add('hidden');
     wrongAnswersScreen.classList.add('hidden');
     
+    // 5分钟后允许交卷
+    setTimeout(() => {
+        canSubmit = true;
+        submitBtn.disabled = false;
+    }, 5 * 60 * 1000);
+    
+    startTimer();
     showCurrentQuestion();
+}
+
+// 启动计时器
+function startTimer() {
+    const timerDisplay = document.createElement('div');
+    timerDisplay.id = 'timer-display';
+    examScreen.insertBefore(timerDisplay, document.querySelector('.question-container'));
+
+    examTimer = setInterval(() => {
+        examTimeLeft--;
+        const minutes = Math.floor(examTimeLeft / 60);
+        const seconds = examTimeLeft % 60;
+        timerDisplay.innerHTML = `剩余时间: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+        
+        // 最后5分钟红色警示
+        if (examTimeLeft <= 5 * 60) {
+            timerDisplay.style.color = '#e74c3c';
+            timerDisplay.classList.add('blink');
+        }
+        
+        // 时间结束自动交卷
+        if (examTimeLeft <= 0) {
+            clearInterval(examTimer);
+            showResult();
+        }
+    }, 1000);
 }
 
 // 生成随机试卷
 function generateRandomExam() {
     currentExam = [];
     
-    // 处理选择题
+    // 随机选择40道选择题
     const shuffledChoices = [...examData.single_choice].sort(() => 0.5 - Math.random());
-    currentExam.push(...shuffledChoices.slice(0, 40).map(q => {
-        // 找到完整答案内容（如"A、选项内容"）
-        const fullAnswer = q.options.find(opt => 
-            opt.startsWith(q.answer.includes('、') ? q.answer : `${q.answer}、`)
-        ) || q.answer;
-        
-        return {
-            ...q,
-            type: 'choice',
-            shuffledOptions: shuffleOptions([...q.options]),
-            cleanAnswer: fullAnswer  // 存储完整答案内容
-        };
-    }));
+    currentExam.push(...shuffledChoices.slice(0, 40).map(q => ({
+        ...q,
+        type: 'choice',
+        shuffledOptions: shuffleOptions([...q.options]),
+        cleanAnswer: q.answer.includes('、') ? q.answer : `${q.answer.split('、')[0]}、${q.answer}`
+    })));
     
-    // 处理判断题
+    // 随机选择10道判断题
     const shuffledJudgments = [...examData.true_false].sort(() => 0.5 - Math.random());
     currentExam.push(...shuffledJudgments.slice(0, 10).map(q => ({
         ...q,
@@ -163,29 +198,57 @@ function showNextQuestion() {
     }
 }
 
-// 显示预览（不显示正确答案）
+// 显示预览（含退出按钮和未作答标记）
 function showPreview() {
     examScreen.classList.add('hidden');
     reviewScreen.classList.remove('hidden');
     previewContainer.innerHTML = '';
     
+    // 添加退出预览按钮
+    const exitPreviewBtn = document.createElement('button');
+    exitPreviewBtn.textContent = '退出预览';
+    exitPreviewBtn.id = 'exit-preview-btn';
+    exitPreviewBtn.addEventListener('click', () => {
+        reviewScreen.classList.add('hidden');
+        examScreen.classList.remove('hidden');
+    });
+    previewContainer.appendChild(exitPreviewBtn);
+    
+    // 生成预览内容
     currentExam.forEach((question, index) => {
         const previewItem = document.createElement('div');
         previewItem.classList.add('preview-item');
-        
+        const userAnswer = userAnswers[index];
+        const isAnswered = userAnswer !== null;
+
+        if (!isAnswered) {
+            previewItem.classList.add('unanswered');
+        }
+
         previewItem.innerHTML = `
             <div class="question-header">
                 <strong>第${index + 1}题 (${question.type === 'choice' ? '选择题' : '判断题'})</strong>
+                ${!isAnswered ? '<span class="unanswered-tag">未作答</span>' : ''}
             </div>
             <p class="question-text">${question.question}</p>
-            <p class="user-answer">你的答案: ${userAnswers[index] || '未作答'}</p>
+            <p class="user-answer">${isAnswered ? `你的答案: ${userAnswer}` : '未选择答案'}</p>
         `;
         previewContainer.appendChild(previewItem);
     });
 }
 
+// 处理交卷
+function handleSubmit() {
+    if (!canSubmit) {
+        alert('考试开始5分钟后才能交卷！');
+        return;
+    }
+    showResult();
+}
+
 // 显示结果
 function showResult() {
+    clearInterval(examTimer);
     score = currentExam.reduce((total, q, idx) => {
         return total + (userAnswers[idx] === q.cleanAnswer ? 2 : 0);
     }, 0);
@@ -202,7 +265,7 @@ function showResult() {
     `;
 }
 
-// 显示错题（显示完整正确答案）
+// 显示错题
 function showWrongAnswers() {
     resultScreen.classList.add('hidden');
     wrongAnswersScreen.classList.remove('hidden');
@@ -212,7 +275,6 @@ function showWrongAnswers() {
         if (userAnswers[idx] !== q.cleanAnswer) {
             const wrongItem = document.createElement('div');
             wrongItem.classList.add('wrong-item');
-            
             wrongItem.innerHTML = `
                 <div class="wrong-question">
                     <strong>第${idx + 1}题 (${q.type === 'choice' ? '选择题' : '判断题'})</strong>
