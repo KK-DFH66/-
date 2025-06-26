@@ -40,6 +40,11 @@ window.selectOption = function(selectedOption) {
     });
 };
 
+// 去除选项前缀的辅助函数
+function cleanOptionText(option) {
+    return option.replace(/^[A-Z]、/, '').trim();
+}
+
 // 初始化
 async function init() {
     try {
@@ -49,8 +54,14 @@ async function init() {
         examData = await response.json();
         
         // 验证数据格式
-        if (!examData.choices || !examData.judgments) {
-            throw new Error('题库格式错误');
+        if (!examData.single_choice || !examData.true_false) {
+            throw new Error('题库格式错误，缺少题目类型');
+        }
+
+        // 检查第一道题格式
+        const sampleChoice = examData.single_choice[0];
+        if (!sampleChoice.options || !sampleChoice.answer) {
+            throw new Error('选择题缺少必要字段');
         }
 
         // 绑定事件监听器
@@ -70,11 +81,11 @@ async function init() {
         console.error('初始化错误:', error);
         startBtn.disabled = true;
         startBtn.textContent = '系统初始化失败';
-        alert('系统初始化失败，请检查题库文件');
+        alert(`系统初始化失败: ${error.message}`);
     }
 }
 
-// 其他函数保持不变...
+// 开始考试
 function startExam() {
     currentQuestionIndex = 0;
     userAnswers = [];
@@ -88,20 +99,27 @@ function startExam() {
     showCurrentQuestion();
 }
 
+// 生成随机试卷
 function generateRandomExam() {
     currentExam = [];
-    const shuffledChoices = [...examData.choices].sort(() => 0.5 - Math.random());
+    
+    // 随机选择40道选择题
+    const shuffledChoices = [...examData.single_choice].sort(() => 0.5 - Math.random());
     currentExam.push(...shuffledChoices.slice(0, 40).map(q => ({
         ...q,
         type: 'choice',
-        shuffledOptions: shuffleOptions([...q.options, q.answer])
+        shuffledOptions: shuffleOptions([...q.options].map(cleanOptionText)),
+        cleanAnswer: cleanOptionText(q.answer)
     })));
     
-    const shuffledJudgments = [...examData.judgments].sort(() => 0.5 - Math.random());
+    // 随机选择10道判断题
+    const shuffledJudgments = [...examData.true_false].sort(() => 0.5 - Math.random());
     currentExam.push(...shuffledJudgments.slice(0, 10).map(q => ({
         ...q,
         type: 'judgment',
-        shuffledOptions: ['正确', '错误']
+        shuffledOptions: ['正确', '错误'],
+        cleanAnswer: q.answer ? '正确' : '错误',
+        explanation: q.explanation || '暂无解析'
     })));
     
     userAnswers = new Array(currentExam.length).fill(null);
@@ -157,7 +175,7 @@ function showPreview() {
     currentExam.forEach((question, index) => {
         const previewItem = document.createElement('div');
         const userAnswer = userAnswers[index];
-        const isCorrect = userAnswer === question.answer;
+        const isCorrect = userAnswer === (question.type === 'choice' ? question.cleanAnswer : question.cleanAnswer);
         
         previewItem.classList.add('preview-item');
         if (userAnswer !== null) {
@@ -167,7 +185,7 @@ function showPreview() {
         previewItem.innerHTML = `
             <p><strong>${index + 1}. ${question.question}</strong></p>
             <p>你的答案: ${userAnswer || '未作答'}</p>
-            ${userAnswer !== null ? `<p>正确答案: ${question.answer}</p>` : ''}
+            ${userAnswer !== null ? `<p>正确答案: ${question.type === 'choice' ? question.cleanAnswer : question.cleanAnswer}</p>` : ''}
         `;
         previewContainer.appendChild(previewItem);
     });
@@ -175,7 +193,8 @@ function showPreview() {
 
 function showResult() {
     score = currentExam.reduce((total, question, index) => {
-        return total + (userAnswers[index] === question.answer ? 2 : 0);
+        const correctAnswer = question.type === 'choice' ? question.cleanAnswer : question.cleanAnswer;
+        return total + (userAnswers[index] === correctAnswer ? 2 : 0);
     }, 0);
     
     reviewScreen.classList.add('hidden');
@@ -193,13 +212,15 @@ function showWrongAnswers() {
     
     currentExam.forEach((question, index) => {
         const userAnswer = userAnswers[index];
-        if (userAnswer !== question.answer) {
+        const correctAnswer = question.type === 'choice' ? question.cleanAnswer : question.cleanAnswer;
+        
+        if (userAnswer !== correctAnswer) {
             const wrongAnswerItem = document.createElement('div');
             wrongAnswerItem.classList.add('wrong-answer-item', 'incorrect');
             wrongAnswerItem.innerHTML = `
                 <p><strong>${index + 1}. ${question.question}</strong></p>
                 <p>你的答案: ${userAnswer || '未作答'}</p>
-                <p>正确答案: ${question.answer}</p>
+                <p>正确答案: ${correctAnswer}</p>
                 ${question.explanation ? `<p>解析: ${question.explanation}</p>` : ''}
             `;
             wrongAnswersContainer.appendChild(wrongAnswerItem);
