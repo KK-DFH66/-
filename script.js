@@ -28,23 +28,6 @@ const previewContainer = document.querySelector('.preview-container');
 const scoreContainer = document.querySelector('.score-container');
 const wrongAnswersContainer = document.querySelector('.wrong-answers-container');
 
-// 全局函数定义
-window.selectOption = function(selectedOption) {
-    userAnswers[currentQuestionIndex] = selectedOption;
-    const options = document.querySelectorAll('.option');
-    options.forEach(option => {
-        option.classList.remove('selected');
-        if (option.textContent === selectedOption) {
-            option.classList.add('selected');
-        }
-    });
-};
-
-// 去除选项前缀的辅助函数
-function cleanOptionText(option) {
-    return option.replace(/^[A-Z]、/, '').trim();
-}
-
 // 初始化
 async function init() {
     try {
@@ -56,12 +39,6 @@ async function init() {
         // 验证数据格式
         if (!examData.single_choice || !examData.true_false) {
             throw new Error('题库格式错误，缺少题目类型');
-        }
-
-        // 检查第一道题格式
-        const sampleChoice = examData.single_choice[0];
-        if (!sampleChoice.options || !sampleChoice.answer) {
-            throw new Error('选择题缺少必要字段');
         }
 
         // 绑定事件监听器
@@ -76,7 +53,6 @@ async function init() {
             resultScreen.classList.remove('hidden');
         });
 
-        startBtn.disabled = false;
     } catch (error) {
         console.error('初始化错误:', error);
         startBtn.disabled = true;
@@ -91,11 +67,14 @@ function startExam() {
     userAnswers = [];
     score = 0;
     generateRandomExam();
+    
+    // 重置界面状态
     startScreen.classList.add('hidden');
     examScreen.classList.remove('hidden');
     reviewScreen.classList.add('hidden');
     resultScreen.classList.add('hidden');
     wrongAnswersScreen.classList.add('hidden');
+    
     showCurrentQuestion();
 }
 
@@ -108,8 +87,8 @@ function generateRandomExam() {
     currentExam.push(...shuffledChoices.slice(0, 40).map(q => ({
         ...q,
         type: 'choice',
-        shuffledOptions: shuffleOptions([...q.options].map(cleanOptionText)),
-        cleanAnswer: cleanOptionText(q.answer)
+        shuffledOptions: shuffleOptions([...q.options]),
+        cleanAnswer: q.answer.startsWith('A、') ? q.answer : `A、${q.answer}` // 统一答案格式
     })));
     
     // 随机选择10道判断题
@@ -119,39 +98,64 @@ function generateRandomExam() {
         type: 'judgment',
         shuffledOptions: ['正确', '错误'],
         cleanAnswer: q.answer ? '正确' : '错误',
-        explanation: q.explanation || '暂无解析'
+        explanation: q.explanation || "暂无详细解析"
     })));
     
     userAnswers = new Array(currentExam.length).fill(null);
 }
 
+// 打乱选项顺序
 function shuffleOptions(options) {
-    return options.sort(() => 0.5 - Math.random());
+    return [...options].sort(() => 0.5 - Math.random());
 }
 
+// 显示当前题目
 function showCurrentQuestion() {
     const question = currentExam[currentQuestionIndex];
+    
+    // 更新进度条
     progressBar.style.width = `${(currentQuestionIndex + 1) / currentExam.length * 100}%`;
+    
+    // 显示题目信息
     questionTypeElement.textContent = question.type === 'choice' ? '选择题' : '判断题';
     questionTextElement.textContent = `${currentQuestionIndex + 1}. ${question.question}`;
     
+    // 显示选项
     optionsContainer.innerHTML = '';
     question.shuffledOptions.forEach(option => {
         const optionElement = document.createElement('div');
         optionElement.classList.add('option');
         optionElement.textContent = option;
+        
+        // 标记已选答案
         if (userAnswers[currentQuestionIndex] === option) {
             optionElement.classList.add('selected');
         }
+        
         optionElement.addEventListener('click', () => selectOption(option));
         optionsContainer.appendChild(optionElement);
     });
     
+    // 更新导航按钮状态
     prevBtn.disabled = currentQuestionIndex === 0;
-    nextBtn.disabled = currentQuestionIndex === currentExam.length - 1;
     nextBtn.textContent = currentQuestionIndex === currentExam.length - 1 ? '预览' : '下一题';
 }
 
+// 选择选项
+function selectOption(selectedOption) {
+    userAnswers[currentQuestionIndex] = selectedOption;
+    
+    // 更新选项样式
+    const options = document.querySelectorAll('.option');
+    options.forEach(option => {
+        option.classList.remove('selected');
+        if (option.textContent === selectedOption) {
+            option.classList.add('selected');
+        }
+    });
+}
+
+// 上一题
 function showPreviousQuestion() {
     if (currentQuestionIndex > 0) {
         currentQuestionIndex--;
@@ -159,80 +163,112 @@ function showPreviousQuestion() {
     }
 }
 
+// 下一题/预览
 function showNextQuestion() {
     if (currentQuestionIndex < currentExam.length - 1) {
         currentQuestionIndex++;
         showCurrentQuestion();
     } else {
+        // 确保是最后一题时触发预览
         showPreview();
     }
 }
 
+// 显示预览
 function showPreview() {
+    // 切换界面
     examScreen.classList.add('hidden');
     reviewScreen.classList.remove('hidden');
+    
+    // 生成预览内容
     previewContainer.innerHTML = '';
     currentExam.forEach((question, index) => {
-        const previewItem = document.createElement('div');
         const userAnswer = userAnswers[index];
-        const isCorrect = userAnswer === (question.type === 'choice' ? question.cleanAnswer : question.cleanAnswer);
+        const correctAnswer = question.type === 'choice' 
+            ? question.cleanAnswer 
+            : question.cleanAnswer;
+        const isCorrect = userAnswer === correctAnswer;
         
+        const previewItem = document.createElement('div');
         previewItem.classList.add('preview-item');
         if (userAnswer !== null) {
             previewItem.classList.add(isCorrect ? 'correct' : 'incorrect');
         }
         
         previewItem.innerHTML = `
-            <p><strong>${index + 1}. ${question.question}</strong></p>
-            <p>你的答案: ${userAnswer || '未作答'}</p>
-            ${userAnswer !== null ? `<p>正确答案: ${question.type === 'choice' ? question.cleanAnswer : question.cleanAnswer}</p>` : ''}
+            <div class="question-header">
+                <strong>第${index + 1}题 (${question.type === 'choice' ? '选择题' : '判断题'})</strong>
+                <span class="result-tag">${isCorrect ? '✓ 正确' : '✗ 错误'}</span>
+            </div>
+            <p class="question-text">${question.question}</p>
+            <p class="user-answer">你的答案: ${userAnswer || '未作答'}</p>
+            <p class="correct-answer">正确答案: ${correctAnswer}</p>
+            ${question.explanation ? `<div class="explanation">解析: ${question.explanation}</div>` : ''}
         `;
+        
         previewContainer.appendChild(previewItem);
     });
+    
+    // 滚动到顶部
+    window.scrollTo(0, 0);
 }
 
+// 显示结果
 function showResult() {
+    // 计算分数
     score = currentExam.reduce((total, question, index) => {
-        const correctAnswer = question.type === 'choice' ? question.cleanAnswer : question.cleanAnswer;
+        const correctAnswer = question.type === 'choice' 
+            ? question.cleanAnswer 
+            : question.cleanAnswer;
         return total + (userAnswers[index] === correctAnswer ? 2 : 0);
     }, 0);
     
+    // 切换界面
     reviewScreen.classList.add('hidden');
     resultScreen.classList.remove('hidden');
+    
+    // 显示分数
     scoreContainer.innerHTML = `
-        <p>你的得分: <strong>${score} / 100</strong></p>
-        <p>答对题数: ${score / 2} / 50</p>
+        <h3>考试结果</h3>
+        <p class="total-score">总分: <span>${score}</span> / 100</p>
+        <div class="score-detail">
+            <p>选择题: ${Math.floor(score/2)} / 40</p>
+            <p>判断题: ${score%2} / 10</p>
+        </div>
     `;
 }
 
+// 显示错题
 function showWrongAnswers() {
     resultScreen.classList.add('hidden');
     wrongAnswersScreen.classList.remove('hidden');
-    wrongAnswersContainer.innerHTML = '';
+    
+    wrongAnswersContainer.innerHTML = '<h3>错题回顾</h3>';
     
     currentExam.forEach((question, index) => {
         const userAnswer = userAnswers[index];
-        const correctAnswer = question.type === 'choice' ? question.cleanAnswer : question.cleanAnswer;
+        const correctAnswer = question.type === 'choice' 
+            ? question.cleanAnswer 
+            : question.cleanAnswer;
         
         if (userAnswer !== correctAnswer) {
-            const wrongAnswerItem = document.createElement('div');
-            wrongAnswerItem.classList.add('wrong-answer-item', 'incorrect');
-            wrongAnswerItem.innerHTML = `
-                <p><strong>${index + 1}. ${question.question}</strong></p>
-                <p>你的答案: ${userAnswer || '未作答'}</p>
-                <p>正确答案: ${correctAnswer}</p>
-                ${question.explanation ? `<p>解析: ${question.explanation}</p>` : ''}
+            const wrongItem = document.createElement('div');
+            wrongItem.classList.add('wrong-item');
+            wrongItem.innerHTML = `
+                <div class="wrong-question">
+                    <strong>第${index + 1}题</strong>
+                    <p>${question.question}</p>
+                </div>
+                <div class="wrong-answer">
+                    <p>你的答案: <span class="user-wrong">${userAnswer || '未作答'}</span></p>
+                    <p>正确答案: <span class="correct-highlight">${correctAnswer}</span></p>
+                </div>
+                ${question.explanation ? `<div class="wrong-explanation">解析: ${question.explanation}</div>` : ''}
             `;
-            wrongAnswersContainer.appendChild(wrongAnswerItem);
+            wrongAnswersContainer.appendChild(wrongItem);
         }
     });
 }
 
 // 启动初始化
-document.addEventListener('DOMContentLoaded', () => {
-    init().catch(error => {
-        console.error('系统启动失败:', error);
-        startBtn.textContent = '点击重试';
-        startBtn.onclick = () => window.location.reload();
-    });
-});
+document.addEventListener('DOMContentLoaded', init);
