@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>在线考试系统</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div id="start-screen" class="screen">
+            <h1>在线考试系统</h1>
+            <p>本次考试包含40道选择题和10道判断题，每题2分，满分100分。</p>
+            <button id="start-btn">开始考试</button>
+        </div>
+
+        <div id="exam-screen" class="screen hidden">
+            <div class="progress-bar">
+                <div class="progress"></div>
+            </div>
+            <div class="question-container">
+                <div class="question-type"></div>
+                <div class="question-text"></div>
+                <div class="options-container"></div>
+            </div>
+            <div class="navigation-btns">
+                <button id="prev-btn">上一题</button>
+                <button id="next-btn">下一题</button>
+            </div>
+        </div>
+
+        <div id="review-screen" class="screen hidden">
+            <h2>题目预览</h2>
+            <div class="preview-container"></div>
+            <button id="submit-btn">交卷</button>
+        </div>
+
+        <div id="result-screen" class="screen hidden">
+            <h2>考试结果</h2>
+            <div class="score-container"></div>
+            <div class="result-btns">
+                <button id="view-wrong-btn">查看错题</button>
+                <button id="new-exam-btn">重新考试</button>
+            </div>
+        </div>
+
+        <div id="wrong-answers-screen" class="screen hidden">
+            <h2>错题回顾</h2>
+            <div class="wrong-answers-container"></div>
+            <button id="back-to-result-btn">返回结果</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
