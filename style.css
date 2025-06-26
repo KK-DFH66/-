@@ -1,3 +1,4 @@
+/* ===== 基础样式 ===== */
 body {
     font-family: 'Arial', sans-serif;
     line-height: 1.6;
@@ -27,7 +28,7 @@ body {
     display: none;
 }
 
-h1, h2 {
+h1, h2, h3 {
     color: #2c3e50;
     text-align: center;
 }
@@ -48,6 +49,12 @@ button:hover {
     background-color: #2980b9;
 }
 
+button:disabled {
+    background-color: #95a5a6;
+    cursor: not-allowed;
+}
+
+/* ===== 考试界面样式 ===== */
 .progress-bar {
     width: 100%;
     height: 20px;
@@ -86,21 +93,24 @@ button:hover {
 }
 
 .option {
-    padding: 10px;
-    margin: 5px 0;
+    padding: 12px 15px;
+    margin: 8px 0;
     background-color: #ecf0f1;
     border-radius: 5px;
     cursor: pointer;
-    transition: background-color 0.3s;
+    transition: all 0.3s;
+    border-left: 3px solid transparent;
 }
 
 .option:hover {
-    background-color: #bdc3c7;
+    background-color: #d6eaf8;
+    border-left-color: #3498db;
 }
 
 .option.selected {
     background-color: #3498db;
     color: white;
+    border-left-color: #2980b9;
 }
 
 .navigation-btns {
@@ -109,36 +119,163 @@ button:hover {
     width: 100%;
 }
 
-.preview-container, .wrong-answers-container {
+/* ===== 预览界面样式 ===== */
+.preview-container {
     width: 100%;
-    max-height: 400px;
+    max-height: 60vh;
     overflow-y: auto;
     margin-bottom: 20px;
+    padding-right: 5px;
 }
 
-.preview-item, .wrong-answer-item {
+.preview-item {
+    background: white;
     padding: 15px;
+    margin-bottom: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    border-left: 4px solid #ddd;
+}
+
+.preview-item.correct {
+    border-left-color: #4CAF50;
+    background-color: #f8fff8;
+}
+
+.preview-item.incorrect {
+    border-left-color: #f44336;
+    background-color: #fff8f8;
+}
+
+.question-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 10px;
-    background-color: #f9f9f9;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #eee;
+}
+
+.result-tag {
+    padding: 3px 10px;
+    border-radius: 15px;
+    font-size: 14px;
+    font-weight: bold;
+    color: white;
+}
+
+.preview-item.correct .result-tag {
+    background-color: #4CAF50;
+}
+
+.preview-item.incorrect .result-tag {
+    background-color: #f44336;
+}
+
+.user-answer, .correct-answer {
+    margin: 8px 0;
+    padding-left: 10px;
+    border-left: 2px solid #eee;
+}
+
+.correct-answer {
+    font-weight: bold;
+}
+
+.explanation {
+    margin-top: 12px;
+    padding: 10px;
+    background-color: #f5f9ff;
     border-radius: 5px;
-    border-left: 4px solid #3498db;
+    border-left: 3px solid #2196F3;
+    font-size: 14px;
 }
 
-.preview-item.correct, .wrong-answer-item.correct {
-    border-left-color: #2ecc71;
-}
-
-.preview-item.incorrect, .wrong-answer-item.incorrect {
-    border-left-color: #e74c3c;
-}
-
+/* ===== 结果界面样式 ===== */
 .score-container {
-    font-size: 24px;
-    margin: 20px 0;
     text-align: center;
+    padding: 20px;
 }
 
-.result-btns {
+.total-score {
+    font-size: 24px;
+    margin: 15px 0;
+}
+
+.total-score span {
+    color: #2196F3;
+    font-weight: bold;
+    font-size: 28px;
+}
+
+.score-detail {
     display: flex;
     justify-content: center;
+    gap: 30px;
+    margin: 20px 0;
+}
+
+/* ===== 错题界面样式 ===== */
+.wrong-answers-container {
+    width: 100%;
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.wrong-item {
+    background: white;
+    padding: 15px;
+    margin-bottom: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.user-wrong {
+    color: #f44336;
+    font-weight: bold;
+}
+
+.correct-highlight {
+    color: #4CAF50;
+    font-weight: bold;
+}
+
+.wrong-explanation {
+    margin-top: 10px;
+    padding: 10px;
+    background-color: #fff8f0;
+    border-radius: 5px;
+}
+
+/* ===== 响应式设计 ===== */
+@media (max-width: 600px) {
+    .container {
+        padding: 15px;
+    }
+    
+    .question-text {
+        font-size: 16px;
+    }
+    
+    .option {
+        padding: 10px 12px;
+    }
+    
+    .preview-item, .wrong-item {
+        padding: 12px;
+    }
+    
+    .question-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .result-tag {
+        margin-top: 5px;
+    }
+    
+    .score-detail {
+        flex-direction: column;
+        gap: 10px;
+    }
 }
