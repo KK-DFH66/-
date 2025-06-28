@@ -202,7 +202,7 @@ function startExam() {
     setTimeout(() => {
         AppState.canSubmit = true;
         updateUIState();
-    }, 10 * 60 * 1000);
+    }, 5 * 60 * 1000);
     
     startTimer();
     showCurrentQuestion();
@@ -446,7 +446,7 @@ function startTimer() {
 // 处理交卷
 function handleSubmit() {
     if (!AppState.canSubmit) {
-        alert('考试开始10分钟后才能交卷！');
+        alert('考试开始5分钟后才能交卷！');
         return;
     }
     showResult();
