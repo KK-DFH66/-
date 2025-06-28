@@ -34,7 +34,6 @@ const progressText = document.querySelector('.progress-text');
 const singleChoiceGrid = document.getElementById('single-choice-grid');
 const multiChoiceGrid = document.getElementById('multi-choice-grid');
 const judgmentGrid = document.getElementById('judgment-grid');
-const scoreContainer = document.querySelector('.score-container');
 const wrongAnswersContainer = document.querySelector('.wrong-answers-container');
 const questionContainer = document.querySelector('.question-container');
 
@@ -120,7 +119,7 @@ function startExam() {
     
     clearInterval(examTimer);
     document.getElementById('timer-display')?.remove();
-    document.getElementById('review-timer-display')?.remove();
+    document.getElementById('sheet-timer-display')?.remove();
     
     startScreen.classList.add('hidden');
     examScreen.classList.remove('hidden');
@@ -145,9 +144,9 @@ function startTimer() {
     timerDisplay.id = 'timer-display';
     examScreen.insertBefore(timerDisplay, document.querySelector('.progress-bar'));
 
-    const reviewTimerDisplay = document.createElement('div');
-    reviewTimerDisplay.id = 'review-timer-display';
-    answerSheetScreen.insertBefore(reviewTimerDisplay, document.querySelector('h2'));
+    const sheetTimerDisplay = document.createElement('div');
+    sheetTimerDisplay.id = 'sheet-timer-display';
+    answerSheetScreen.insertBefore(sheetTimerDisplay, document.querySelector('h2'));
 
     examTimer = setInterval(() => {
         examTimeLeft--;
@@ -156,13 +155,13 @@ function startTimer() {
         const timeString = `剩余时间: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
         
         timerDisplay.textContent = timeString;
-        reviewTimerDisplay.textContent = timeString;
+        sheetTimerDisplay.textContent = timeString;
         
         if (examTimeLeft <= 5 * 60) {
             timerDisplay.style.color = '#e74c3c';
             timerDisplay.classList.add('blink');
-            reviewTimerDisplay.style.color = '#e74c3c';
-            reviewTimerDisplay.classList.add('blink');
+            sheetTimerDisplay.style.color = '#e74c3c';
+            sheetTimerDisplay.classList.add('blink');
         }
         
         if (examTimeLeft <= 0) {
