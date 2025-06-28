@@ -224,7 +224,7 @@ button:disabled {
     color: var(--primary-color);
 }
 
-.preview-header {
+.sheet-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -304,7 +304,7 @@ button:disabled {
     transform: scale(1.05);
 }
 
-.preview-footer {
+.sheet-footer {
     display: flex;
     justify-content: space-between;
 }
@@ -434,7 +434,7 @@ button:disabled {
 }
 
 /* 计时器样式 */
-#timer-display, #review-timer-display {
+#timer-display, #sheet-timer-display {
     position: fixed;
     top: 20px;
     right: 20px;
@@ -446,7 +446,7 @@ button:disabled {
     z-index: 100;
 }
 
-#timer-display.blink, #review-timer-display.blink {
+#timer-display.blink, #sheet-timer-display.blink {
     animation: blink 1s infinite;
 }
 
@@ -467,13 +467,13 @@ button:disabled {
         min-height: auto;
     }
     
-    #timer-display, #review-timer-display {
+    #timer-display, #sheet-timer-display {
         position: static;
         margin: 0 auto 20px;
         width: fit-content;
     }
     
-    .preview-footer, .result-btns {
+    .sheet-footer, .result-btns {
         flex-direction: column;
         gap: 10px;
     }
