@@ -229,13 +229,16 @@ function generateRandomExam() {
         .slice(0, 100)
         .map(q => {
             const shuffledOptions = shuffleOptions([...q.options]);
-            const correctAnswer = shuffledOptions[q.answer - 1];
+            // 找到原始正确答案在选项中的索引
+            const originalCorrectIndex = q.options.findIndex(opt => opt.startsWith(q.answer + "、"));
+            // 获取随机后的正确答案
+            const correctAnswer = shuffledOptions[originalCorrectIndex];
             return {
                 ...q,
                 type: 'single_choice',
                 shuffledOptions: shuffledOptions,
                 correctAnswer: correctAnswer,
-                displayAnswer: correctAnswer // 用于显示的正确答案
+                displayAnswer: correctAnswer // 用于显示的正确答案（完整选项文本）
             };
         });
     
@@ -245,13 +248,17 @@ function generateRandomExam() {
         .slice(0, 20)
         .map(q => {
             const shuffledOptions = shuffleOptions([...q.options]);
-            const correctAnswers = q.answer.map(index => shuffledOptions[index - 1]);
+            // 获取随机后的正确答案数组
+            const correctAnswers = q.answer.map(index => {
+                const originalIndex = q.options.findIndex(opt => opt.startsWith(index + "、"));
+                return shuffledOptions[originalIndex];
+            });
             return {
                 ...q,
                 type: 'multiple_choice',
                 shuffledOptions: shuffledOptions,
                 correctAnswer: correctAnswers, // 用于比较的正确答案数组
-                displayAnswer: correctAnswers.join('、') // 用于显示的正确答案
+                displayAnswer: correctAnswers.join('、') // 用于显示的正确答案（完整选项文本）
             };
         });
     
