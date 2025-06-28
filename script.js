@@ -172,7 +172,7 @@ function generateRandomExam() {
     
     // 合并为板块化试卷
     currentExam = [...singleChoices, ...multiChoices, ...judgments];
-    userAnswers = new Array(currentExam.length).fill(null).map(() => []);
+    userAnswers = new Array(currentExam.length).fill(null);
 }
 
 // 打乱选项顺序
@@ -294,32 +294,30 @@ function showPreview() {
     reviewScreen.classList.remove('hidden');
     previewContainer.innerHTML = '';
     
-    // 统计已作答题目
     let answeredCount = 0;
-    
-    // 生成预览内容
+
     currentExam.forEach((question, index) => {
         const userAnswer = userAnswers[index];
-        const isAnswered = question.type === 'multiple_choice' 
-            ? userAnswer && userAnswer.length > 0
-            : userAnswer !== null && userAnswer !== undefined;
-        
+        let isAnswered = false;
+        let formattedUserAnswer = '未选择';
+
+        // 统一作答判断逻辑
+        if (question.type === 'multiple_choice') {
+            isAnswered = Array.isArray(userAnswer) && userAnswer.length > 0;
+            formattedUserAnswer = isAnswered ? userAnswer.join('、') : '未选择';
+        } else {
+            isAnswered = userAnswer !== null && userAnswer !== undefined;
+            formattedUserAnswer = isAnswered ? userAnswer : '未选择';
+        }
+
         if (isAnswered) answeredCount++;
-        
+
         const previewItem = document.createElement('div');
         previewItem.classList.add('preview-item');
-        if (!isAnswered) previewItem.classList.add('unanswered');
-        
-        // 格式化用户答案
-        let formattedUserAnswer = '';
-        if (question.type === 'multiple_choice') {
-            formattedUserAnswer = Array.isArray(userAnswer) 
-                ? userAnswer.join('、') 
-                : '未选择';
-        } else {
-            formattedUserAnswer = userAnswer || '未选择';
+        if (!isAnswered) {
+            previewItem.classList.add('unanswered');
         }
-        
+
         previewItem.innerHTML = `
             <div class="question-header">
                 <strong>第${index + 1}题 (${getQuestionTypeText(question.type)})</strong>
@@ -328,19 +326,17 @@ function showPreview() {
             <p class="question-text">${question.question}</p>
             <p class="user-answer">你的答案: ${formattedUserAnswer}</p>
         `;
-        
-        // 点击题目跳转
+
         previewItem.addEventListener('click', () => {
             currentQuestionIndex = index;
             reviewScreen.classList.add('hidden');
             examScreen.classList.remove('hidden');
             showCurrentQuestion();
         });
-        
+
         previewContainer.appendChild(previewItem);
     });
-    
-    // 更新已作答计数
+
     document.getElementById('answered-count').textContent = answeredCount;
     
     // 添加操作按钮
