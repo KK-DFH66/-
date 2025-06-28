@@ -8,7 +8,7 @@ let examTimer;
 let examTimeLeft = 90 * 60; // 90分钟倒计时
 let canSubmit = false;
 let touchStartX = 0;
-let touchEndX = 0;
+let isMobile = /Mobi|Android/i.test(navigator.userAgent);
 
 // DOM元素
 const startScreen = document.getElementById('start-screen');
@@ -18,12 +18,12 @@ const resultScreen = document.getElementById('result-screen');
 const wrongAnswersScreen = document.getElementById('wrong-answers-screen');
 
 const startBtn = document.getElementById('start-btn');
-const answerSheetBtn = document.getElementById('answer-sheet-btn');
-const exitSheetBtn = document.getElementById('exit-sheet-btn');
 const submitBtn = document.getElementById('submit-btn');
 const viewWrongBtn = document.getElementById('view-wrong-btn');
 const newExamBtn = document.getElementById('new-exam-btn');
 const backToResultBtn = document.getElementById('back-to-result-btn');
+const answerSheetBtn = document.getElementById('answer-sheet-btn');
+const backToExamBtn = document.getElementById('back-to-exam-btn');
 
 const sectionTitleElement = document.getElementById('section-title');
 const questionTypeElement = document.querySelector('.question-type');
@@ -31,33 +31,10 @@ const questionTextElement = document.querySelector('.question-text');
 const optionsContainer = document.querySelector('.options-container');
 const progressBar = document.querySelector('.progress');
 const progressText = document.querySelector('.progress-text');
-const singleChoiceGrid = document.getElementById('single-choice-grid');
-const multiChoiceGrid = document.getElementById('multi-choice-grid');
-const judgmentGrid = document.getElementById('judgment-grid');
-const wrongAnswersContainer = document.querySelector('.wrong-answers-container');
-const questionContainer = document.querySelector('.question-container');
-
-// 电脑端滚轮事件处理
-function handleWheel(event) {
-    // 阻止默认滚动行为
-    event.preventDefault();
-    event.stopPropagation();
-    
-    // 向下滚动 - 下一题
-    if (event.deltaY > 0) {
-        if (currentQuestionIndex < currentExam.length - 1) {
-            currentQuestionIndex++;
-            showCurrentQuestion();
-        }
-    } 
-    // 向上滚动 - 上一题
-    else if (event.deltaY < 0) {
-        if (currentQuestionIndex > 0) {
-            currentQuestionIndex--;
-            showCurrentQuestion();
-        }
-    }
-}
+const singleChoiceSheet = document.getElementById('single-choice-sheet');
+const multiChoiceSheet = document.getElementById('multi-choice-sheet');
+const judgmentSheet = document.getElementById('judgment-sheet');
+const answeredCountElement = document.getElementById('answered-count');
 
 // 初始化
 async function init() {
@@ -78,8 +55,6 @@ async function init() {
         }
 
         startBtn.addEventListener('click', startExam);
-        answerSheetBtn.addEventListener('click', showAnswerSheet);
-        exitSheetBtn.addEventListener('click', exitAnswerSheet);
         submitBtn.addEventListener('click', handleSubmit);
         viewWrongBtn.addEventListener('click', showWrongAnswers);
         newExamBtn.addEventListener('click', startExam);
@@ -87,15 +62,19 @@ async function init() {
             wrongAnswersScreen.classList.add('hidden');
             resultScreen.classList.remove('hidden');
         });
+        answerSheetBtn.addEventListener('click', showAnswerSheet);
+        backToExamBtn.addEventListener('click', () => {
+            answerSheetScreen.classList.add('hidden');
+            examScreen.classList.remove('hidden');
+        });
 
-        // 添加触摸事件监听（移动端）
-        questionContainer.addEventListener('touchstart', handleTouchStart, false);
-        questionContainer.addEventListener('touchend', handleTouchEnd, false);
-        
-        // 添加滚轮事件监听（电脑端）
-        questionContainer.addEventListener('wheel', handleWheel, { passive: false });
-        // 兼容旧版浏览器
-        questionContainer.addEventListener('mousewheel', handleWheel, { passive: false });
+        // 添加触摸/滚轮事件
+        if (isMobile) {
+            examScreen.addEventListener('touchstart', handleTouchStart, false);
+            examScreen.addEventListener('touchend', handleTouchEnd, false);
+        } else {
+            examScreen.addEventListener('wheel', handleWheel, { passive: false });
+        }
 
     } catch (error) {
         console.error('初始化错误:', error);
@@ -105,33 +84,31 @@ async function init() {
     }
 }
 
-// 触摸开始事件处理
-function handleTouchStart(event) {
-    touchStartX = event.changedTouches[0].screenX;
+// 触摸事件处理
+function handleTouchStart(e) {
+    touchStartX = e.changedTouches[0].screenX;
 }
 
-// 触摸结束事件处理
-function handleTouchEnd(event) {
-    touchEndX = event.changedTouches[0].screenX;
-    handleSwipe();
-}
-
-// 处理滑动动作
-function handleSwipe() {
-    const threshold = 50; // 滑动阈值
+function handleTouchEnd(e) {
+    const touchEndX = e.changedTouches[0].screenX;
+    const diffX = touchEndX - touchStartX;
     
-    if (touchEndX < touchStartX - threshold) {
-        // 向左滑动 - 下一题
-        if (currentQuestionIndex < currentExam.length - 1) {
-            currentQuestionIndex++;
-            showCurrentQuestion();
+    if (Math.abs(diffX) > 50) { // 滑动阈值
+        if (diffX > 0) {
+            showPreviousQuestion();
+        } else {
+            showNextQuestion();
         }
-    } else if (touchEndX > touchStartX + threshold) {
-        // 向右滑动 - 上一题
-        if (currentQuestionIndex > 0) {
-            currentQuestionIndex--;
-            showCurrentQuestion();
-        }
+    }
+}
+
+// 滚轮事件处理
+function handleWheel(e) {
+    e.preventDefault();
+    if (e.deltaY > 0) {
+        showNextQuestion();
+    } else if (e.deltaY < 0) {
+        showPreviousQuestion();
     }
 }
 
@@ -146,7 +123,6 @@ function startExam() {
     
     clearInterval(examTimer);
     document.getElementById('timer-display')?.remove();
-    document.getElementById('sheet-timer-display')?.remove();
     
     startScreen.classList.add('hidden');
     examScreen.classList.remove('hidden');
@@ -162,7 +138,7 @@ function startExam() {
     
     startTimer();
     showCurrentQuestion();
-    initAnswerSheet();
+    updateAnswerSheet();
 }
 
 // 启动计时器
@@ -241,49 +217,6 @@ function generateRandomExam() {
     userAnswers = new Array(currentExam.length).fill(null);
 }
 
-// 初始化答题卡
-function initAnswerSheet() {
-    singleChoiceGrid.innerHTML = '';
-    multiChoiceGrid.innerHTML = '';
-    judgmentGrid.innerHTML = '';
-    
-    // 单选题答题卡
-    for (let i = 0; i < 100; i++) {
-        const answerItem = document.createElement('div');
-        answerItem.classList.add('answer-sheet-item');
-        answerItem.textContent = i + 1;
-        answerItem.addEventListener('click', () => {
-            currentQuestionIndex = i;
-            exitAnswerSheet();
-        });
-        singleChoiceGrid.appendChild(answerItem);
-    }
-    
-    // 多选题答题卡
-    for (let i = 100; i < 120; i++) {
-        const answerItem = document.createElement('div');
-        answerItem.classList.add('answer-sheet-item');
-        answerItem.textContent = i + 1;
-        answerItem.addEventListener('click', () => {
-            currentQuestionIndex = i;
-            exitAnswerSheet();
-        });
-        multiChoiceGrid.appendChild(answerItem);
-    }
-    
-    // 判断题答题卡
-    for (let i = 120; i < 150; i++) {
-        const answerItem = document.createElement('div');
-        answerItem.classList.add('answer-sheet-item');
-        answerItem.textContent = i + 1;
-        answerItem.addEventListener('click', () => {
-            currentQuestionIndex = i;
-            exitAnswerSheet();
-        });
-        judgmentGrid.appendChild(answerItem);
-    }
-}
-
 // 打乱选项顺序
 function shuffleOptions(options) {
     return [...options].sort(() => Math.random() - 0.5);
@@ -336,7 +269,7 @@ function showCurrentQuestion() {
         optionsContainer.appendChild(optionElement);
     });
     
-    // 更新答题卡状态
+    // 更新答题卡当前题目标记
     updateAnswerSheet();
 }
 
@@ -363,6 +296,23 @@ function selectOption(selectedOption) {
     
     // 刷新选项显示
     showCurrentQuestion();
+    updateAnswerSheet();
+}
+
+// 上一题
+function showPreviousQuestion() {
+    if (currentQuestionIndex > 0) {
+        currentQuestionIndex--;
+        showCurrentQuestion();
+    }
+}
+
+// 下一题
+function showNextQuestion() {
+    if (currentQuestionIndex < currentExam.length - 1) {
+        currentQuestionIndex++;
+        showCurrentQuestion();
+    }
 }
 
 // 显示答题卡
@@ -370,48 +320,55 @@ function showAnswerSheet() {
     examScreen.classList.add('hidden');
     answerSheetScreen.classList.remove('hidden');
     
-    // 更新答题卡状态
-    updateAnswerSheet();
-    
-    // 更新提交按钮状态
-    submitBtn.disabled = !canSubmit;
-    submitBtn.textContent = canSubmit ? '确认交卷' : '15分钟后可交卷';
+    // 更新已回答数量
+    const answeredCount = userAnswers.filter(answer => 
+        answer !== null && (Array.isArray(answer) ? answer.length > 0 : true)
+        .length;
+    answeredCountElement.textContent = answeredCount;
 }
 
-// 更新答题卡状态
+// 更新答题卡
 function updateAnswerSheet() {
-    let answeredCount = 0;
-    const allItems = [
-        ...singleChoiceGrid.querySelectorAll('.answer-sheet-item'),
-        ...multiChoiceGrid.querySelectorAll('.answer-sheet-item'),
-        ...judgmentGrid.querySelectorAll('.answer-sheet-item')
-    ];
+    singleChoiceSheet.innerHTML = '';
+    multiChoiceSheet.innerHTML = '';
+    judgmentSheet.innerHTML = '';
     
-    allItems.forEach((item, index) => {
-        const userAnswer = userAnswers[index];
-        let isAnswered = false;
+    currentExam.forEach((question, index) => {
+        const sheetNumber = document.createElement('div');
+        sheetNumber.classList.add('sheet-number');
+        sheetNumber.textContent = index + 1;
         
-        if (currentExam[index].type === 'multiple_choice') {
-            isAnswered = Array.isArray(userAnswer) && userAnswer.length > 0;
-        } else {
-            isAnswered = userAnswer !== null && userAnswer !== undefined;
-        }
-        
-        item.classList.toggle('answered', isAnswered);
+        // 标记已回答的题目
+        const isAnswered = question.type === 'multiple_choice' 
+            ? Array.isArray(userAnswers[index]) && userAnswers[index].length > 0
+            : userAnswers[index] !== null;
         
         if (isAnswered) {
-            answeredCount++;
+            sheetNumber.classList.add('answered');
+        }
+        
+        // 标记当前题目
+        if (index === currentQuestionIndex) {
+            sheetNumber.classList.add('current');
+        }
+        
+        // 添加点击事件
+        sheetNumber.addEventListener('click', () => {
+            currentQuestionIndex = index;
+            answerSheetScreen.classList.add('hidden');
+            examScreen.classList.remove('hidden');
+            showCurrentQuestion();
+        });
+        
+        // 添加到对应的答题卡区域
+        if (index < 100) {
+            singleChoiceSheet.appendChild(sheetNumber);
+        } else if (index < 120) {
+            multiChoiceSheet.appendChild(sheetNumber);
+        } else {
+            judgmentSheet.appendChild(sheetNumber);
         }
     });
-    
-    document.getElementById('answered-count').textContent = answeredCount;
-}
-
-// 退出答题卡
-function exitAnswerSheet() {
-    answerSheetScreen.classList.add('hidden');
-    examScreen.classList.remove('hidden');
-    showCurrentQuestion();
 }
 
 // 处理交卷
@@ -463,26 +420,45 @@ function showResult() {
     const isPassed = score >= 60;
     
     // 显示结果
-    answerSheetScreen.classList.add('hidden');
     examScreen.classList.add('hidden');
+    answerSheetScreen.classList.add('hidden');
     resultScreen.classList.remove('hidden');
     
-    document.querySelector('.total-score').textContent = score.toFixed(1);
-    document.querySelector('.pass-badge').textContent = isPassed ? '合格' : '不合格';
-    document.querySelector('.pass-badge').className = isPassed ? 'pass-badge' : 'pass-badge fail-badge';
-    
-    // 更新各题型得分
-    const singleChoiceElement = document.querySelectorAll('.detail-item')[0];
-    singleChoiceElement.querySelector('.detail-progress').style.width = `${singleChoiceScore / 50 * 100}%`;
-    singleChoiceElement.querySelector('.detail-score').textContent = `${singleChoiceScore.toFixed(1)}/50`;
-    
-    const multiChoiceElement = document.querySelectorAll('.detail-item')[1];
-    multiChoiceElement.querySelector('.detail-progress').style.width = `${multiChoiceScore / 20 * 100}%`;
-    multiChoiceElement.querySelector('.detail-score').textContent = `${multiChoiceScore.toFixed(1)}/20`;
-    
-    const judgmentElement = document.querySelectorAll('.detail-item')[2];
-    judgmentElement.querySelector('.detail-progress').style.width = `${judgmentScore / 30 * 100}%`;
-    judgmentElement.querySelector('.detail-score').textContent = `${judgmentScore.toFixed(1)}/30`;
+    const scoreContainer = document.querySelector('.score-container');
+    scoreContainer.innerHTML = `
+        <div class="result-header">
+            <h2>考试成绩</h2>
+            <div class="score-summary">
+                <span class="total-score">${score.toFixed(1)}</span>
+                <span class="pass-badge ${isPassed ? '' : 'fail-badge'}">
+                    ${isPassed ? '合格' : '不合格'}
+                </span>
+            </div>
+        </div>
+        <div class="score-details">
+            <div class="detail-item">
+                <span class="detail-label">单选题</span>
+                <div class="detail-bar">
+                    <div class="detail-progress" style="width: ${singleChoiceScore / 50 * 100}%"></div>
+                </div>
+                <span class="detail-score">${singleChoiceScore.toFixed(1)}/50</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">多选题</span>
+                <div class="detail-bar">
+                    <div class="detail-progress" style="width: ${multiChoiceScore / 20 * 100}%"></div>
+                </div>
+                <span class="detail-score">${multiChoiceScore.toFixed(1)}/20</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">判断题</span>
+                <div class="detail-bar">
+                    <div class="detail-progress" style="width: ${judgmentScore / 30 * 100}%"></div>
+                </div>
+                <span class="detail-score">${judgmentScore.toFixed(1)}/30</span>
+            </div>
+        </div>
+    `;
 }
 
 // 比较两个数组是否相等
