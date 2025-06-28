@@ -25,10 +25,9 @@ body {
     color: var(--text-color);
     background-color: #f5f7fa;
     padding: 20px;
-    touch-action: pan-y; /* 移动端触摸控制 */
+    touch-action: pan-y;
 }
 
-/* 容器布局 */
 .container {
     max-width: 900px;
     margin: 0 auto;
@@ -49,6 +48,86 @@ body {
     display: none;
 }
 
+/* 按钮样式 */
+button {
+    border: none;
+    border-radius: var(--border-radius);
+    padding: 12px 24px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: bold;
+}
+
+.primary-btn {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.primary-btn:hover {
+    background-color: var(--primary-hover);
+}
+
+.secondary-btn {
+    background-color: var(--light-gray);
+    color: var(--text-color);
+}
+
+.secondary-btn:hover {
+    background-color: #dfe6e9;
+}
+
+button:disabled {
+    background-color: #bdc3c7;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+/* 开始界面 */
+#start-screen {
+    text-align: center;
+    align-items: center;
+    justify-content: center;
+}
+
+#start-screen h1 {
+    color: var(--primary-color);
+    margin-bottom: 30px;
+    font-size: 28px;
+}
+
+.exam-info {
+    text-align: left;
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: var(--border-radius);
+    margin-bottom: 30px;
+    max-width: 600px;
+}
+
+.exam-info h3 {
+    color: var(--primary-color);
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.exam-info ol, .exam-info ul {
+    margin-left: 20px;
+}
+
+.exam-info li {
+    margin-bottom: 8px;
+}
+
+.notice {
+    margin-top: 15px;
+    padding: 10px;
+    background-color: #fff8e1;
+    border-left: 4px solid var(--warning-color);
+    font-size: 14px;
+}
+
 /* 考试界面 - 关键修改点 */
 #exam-screen {
     position: relative;
@@ -56,42 +135,62 @@ body {
 
 .question-container {
     flex-grow: 1;
-    touch-action: pan-y;  /* 兼容移动端滑动 */
-    min-height: 60vh;    /* 确保足够滚动空间 */
-    overflow-y: auto;    /* 允许内容滚动 */
-    padding-bottom: 20px; /* 底部留白 */
-    scrollbar-width: thin; /* Firefox滚动条优化 */
+    touch-action: pan-y;
+    min-height: 60vh; /* 新增：确保足够滚动空间 */
+    overflow-y: auto; /* 新增：允许内容滚动 */
+    padding-bottom: 20px; /* 新增：底部留白 */
 }
 
-/* 自定义滚动条（增强滚轮体验） */
+/* 其余原有样式保持不变... */
+
+/* 答题卡界面 */
+#answer-sheet-screen h2 {
+    margin-bottom: 20px;
+    color: var(--primary-color);
+}
+
+.sheet-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #eee;
+}
+
+/* ...（其他原有样式保持不变）... */
+
+/* 新增：优化滚轮操作体验 */
 .question-container::-webkit-scrollbar {
     width: 5px;
-    height: 5px;
 }
 
 .question-container::-webkit-scrollbar-thumb {
-    background-color: rgba(0, 0, 0, 0.2);
+    background-color: rgba(0,0,0,0.2);
     border-radius: 10px;
 }
-
-.question-container::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-/* 其余原有样式（按钮、答题卡、计时器等） */
-/* ...（保持原有代码不变）... */
 
 /* 响应式设计 */
 @media (max-width: 768px) {
     .container {
         border-radius: 0;
     }
-
-    .question-container {
-        min-height: 50vh;
-        overflow-y: visible; /* 移动端禁用滚动 */
-        -webkit-overflow-scrolling: touch; /* iOS滚动优化 */
+    
+    .screen {
+        padding: 20px;
+        min-height: auto;
     }
-
+    
+    #timer-display, #sheet-timer-display {
+        position: static;
+        margin: 0 auto 20px;
+        width: fit-content;
+    }
+    
+    .question-container {
+        min-height: 50vh; /* 移动端调整高度 */
+        overflow-y: visible; /* 移动端禁用滚动 */
+    }
+    
     /* ...（其他响应式样式保持不变）... */
 }
