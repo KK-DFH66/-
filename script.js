@@ -229,16 +229,18 @@ function generateRandomExam() {
         .slice(0, 100)
         .map(q => {
             const shuffledOptions = shuffleOptions([...q.options]);
-            // 找到原始正确答案在选项中的索引
-            const originalCorrectIndex = q.options.findIndex(opt => opt.startsWith(q.answer + "、"));
-            // 获取随机后的正确答案
-            const correctAnswer = shuffledOptions[originalCorrectIndex];
+            
+            // 获取原始正确答案（如"C、粘度问题"）
+            const correctOption = q.options.find(opt => opt.startsWith(q.answer + "、"));
+            const correctIndex = q.options.indexOf(correctOption);
+            const correctAnswer = shuffledOptions[correctIndex];
+            
             return {
                 ...q,
                 type: 'single_choice',
                 shuffledOptions: shuffledOptions,
                 correctAnswer: correctAnswer,
-                displayAnswer: correctAnswer // 用于显示的正确答案（完整选项文本）
+                displayAnswer: correctAnswer // 存储完整答案文本
             };
         });
     
@@ -248,17 +250,19 @@ function generateRandomExam() {
         .slice(0, 20)
         .map(q => {
             const shuffledOptions = shuffleOptions([...q.options]);
-            // 获取随机后的正确答案数组
-            const correctAnswers = q.answer.map(index => {
-                const originalIndex = q.options.findIndex(opt => opt.startsWith(index + "、"));
-                return shuffledOptions[originalIndex];
+            
+            // 获取所有正确答案的完整文本
+            const correctAnswers = q.answer.map(ans => {
+                const correctOption = q.options.find(opt => opt.startsWith(ans + "、"));
+                return shuffledOptions[q.options.indexOf(correctOption)];
             });
+            
             return {
                 ...q,
                 type: 'multiple_choice',
                 shuffledOptions: shuffledOptions,
-                correctAnswer: correctAnswers, // 用于比较的正确答案数组
-                displayAnswer: correctAnswers.join('、') // 用于显示的正确答案（完整选项文本）
+                correctAnswer: correctAnswers,
+                displayAnswer: correctAnswers.join('、') // 用顿号连接多个答案
             };
         });
     
@@ -476,7 +480,7 @@ function showResult() {
     updateScoreDetails();
 }
 
-// 计算分数（关键修改）
+// 计算分数
 function calculateScore() {
     let singleChoiceScore = 0;
     let multiChoiceScore = 0;
