@@ -1,4 +1,3 @@
-/* 基础样式 */
 :root {
     --primary-color: #3498db;
     --primary-hover: #2980b9;
@@ -48,7 +47,6 @@ body {
     display: none;
 }
 
-/* 按钮样式 */
 button {
     border: none;
     border-radius: var(--border-radius);
@@ -83,7 +81,6 @@ button:disabled {
     opacity: 0.7;
 }
 
-/* 开始界面 */
 #start-screen {
     text-align: center;
     align-items: center;
@@ -128,7 +125,56 @@ button:disabled {
     font-size: 14px;
 }
 
-/* 考试界面 */
+.error-message {
+    color: #e74c3c;
+    margin-top: 15px;
+    padding: 10px;
+    background: #fde8e8;
+    border-radius: 4px;
+    border-left: 3px solid #e74c3c;
+    max-width: 600px;
+    text-align: left;
+}
+
+.error-message.hidden {
+    display: none;
+}
+
+.loading-spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 50%;
+    border-top-color: white;
+    animation: spin 1s linear infinite;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+#start-btn.loading {
+    position: relative;
+    padding-left: 40px;
+}
+
+#start-btn.loading::before {
+    content: "";
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 50%;
+    border-top-color: white;
+    animation: spin 1s linear infinite;
+}
+
 #exam-screen {
     position: relative;
 }
@@ -215,7 +261,6 @@ button:disabled {
     margin-top: 30px;
 }
 
-/* 答题卡界面 */
 #answer-sheet-screen h2 {
     margin-bottom: 20px;
     color: var(--primary-color);
@@ -274,7 +319,6 @@ button:disabled {
     transform: scale(1.1);
 }
 
-/* 结果界面 */
 .result-header {
     text-align: center;
     margin-bottom: 30px;
@@ -349,7 +393,6 @@ button:disabled {
     gap: 20px;
 }
 
-/* 错题界面 */
 .wrong-header {
     text-align: center;
     margin-bottom: 20px;
@@ -398,7 +441,6 @@ button:disabled {
     border-left: 3px solid var(--primary-color);
 }
 
-/* 计时器样式 */
 #timer-display, #sheet-timer-display {
     position: fixed;
     top: 20px;
@@ -421,7 +463,6 @@ button:disabled {
     100% { opacity: 1; }
 }
 
-/* 响应式设计 */
 @media (max-width: 768px) {
     .container {
         border-radius: 0;
