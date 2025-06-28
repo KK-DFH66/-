@@ -219,33 +219,43 @@ function resetExamState() {
     updateUIState();
 }
 
-// 生成随机试卷
+// 生成随机试卷（关键修改）
 function generateRandomExam() {
     AppState.currentExam = [];
     
-    // 单选题
+    // 单选题处理
     const singleChoices = [...AppState.examData.single_choice]
         .sort(() => Math.random() - 0.5)
         .slice(0, 100)
-        .map(q => ({
-            ...q,
-            type: 'single_choice',
-            shuffledOptions: shuffleOptions([...q.options]),
-            cleanAnswer: q.options[q.answer - 1]
-        }));
+        .map(q => {
+            const shuffledOptions = shuffleOptions([...q.options]);
+            const correctAnswer = shuffledOptions[q.answer - 1];
+            return {
+                ...q,
+                type: 'single_choice',
+                shuffledOptions: shuffledOptions,
+                correctAnswer: correctAnswer,
+                displayAnswer: correctAnswer // 用于显示的正确答案
+            };
+        });
     
-    // 多选题
+    // 多选题处理
     const multiChoices = [...AppState.examData.multiple_choice]
         .sort(() => Math.random() - 0.5)
         .slice(0, 20)
-        .map(q => ({
-            ...q,
-            type: 'multiple_choice',
-            shuffledOptions: shuffleOptions([...q.options]),
-            cleanAnswer: q.answer.map(index => q.options[index - 1]).sort().join('、')
-        }));
+        .map(q => {
+            const shuffledOptions = shuffleOptions([...q.options]);
+            const correctAnswers = q.answer.map(index => shuffledOptions[index - 1]);
+            return {
+                ...q,
+                type: 'multiple_choice',
+                shuffledOptions: shuffledOptions,
+                correctAnswer: correctAnswers, // 用于比较的正确答案数组
+                displayAnswer: correctAnswers.join('、') // 用于显示的正确答案
+            };
+        });
     
-    // 判断题
+    // 判断题处理
     const judgments = [...AppState.examData.true_false]
         .sort(() => Math.random() - 0.5)
         .slice(0, 30)
@@ -253,8 +263,8 @@ function generateRandomExam() {
             ...q,
             type: 'true_false',
             shuffledOptions: ['正确', '错误'],
-            cleanAnswer: q.answer ? '正确' : '错误',
-            explanation: q.explanation || "暂无解析"
+            correctAnswer: q.answer ? '正确' : '错误',
+            displayAnswer: q.answer ? '正确' : '错误'
         }));
     
     AppState.currentExam = [...singleChoices, ...multiChoices, ...judgments];
@@ -459,7 +469,7 @@ function showResult() {
     updateScoreDetails();
 }
 
-// 计算分数
+// 计算分数（关键修改）
 function calculateScore() {
     let singleChoiceScore = 0;
     let multiChoiceScore = 0;
@@ -470,13 +480,13 @@ function calculateScore() {
         if (!userAnswer) return;
 
         if (q.type === 'single_choice') {
-            singleChoiceScore += (userAnswer === q.cleanAnswer ? 0.5 : 0);
+            singleChoiceScore += (userAnswer === q.correctAnswer ? 0.5 : 0);
         } 
         else if (q.type === 'multiple_choice') {
             if (!Array.isArray(userAnswer)) return;
             
-            const correctAnswers = q.answer.map(index => q.options[index - 1]).sort();
             const userSelected = [...userAnswer].sort();
+            const correctAnswers = [...q.correctAnswer].sort();
             
             if (arraysEqual(correctAnswers, userSelected)) {
                 multiChoiceScore += 1;
@@ -485,7 +495,7 @@ function calculateScore() {
             }
         } 
         else if (q.type === 'true_false') {
-            judgmentScore += (userAnswer === q.cleanAnswer ? 1 : 0);
+            judgmentScore += (userAnswer === q.correctAnswer ? 1 : 0);
         }
     });
 
@@ -505,13 +515,13 @@ function updateScoreDetails() {
         if (!userAnswer) return;
 
         if (q.type === 'single_choice') {
-            details.single_choice.score += (userAnswer === q.cleanAnswer ? 0.5 : 0);
+            details.single_choice.score += (userAnswer === q.correctAnswer ? 0.5 : 0);
         }
         else if (q.type === 'multiple_choice') {
             if (!Array.isArray(userAnswer)) return;
             
-            const correctAnswers = q.answer.map(index => q.options[index - 1]).sort();
             const userSelected = [...userAnswer].sort();
+            const correctAnswers = [...q.correctAnswer].sort();
             
             if (arraysEqual(correctAnswers, userSelected)) {
                 details.multiple_choice.score += 1;
@@ -520,7 +530,7 @@ function updateScoreDetails() {
             }
         }
         else if (q.type === 'true_false') {
-            details.true_false.score += (userAnswer === q.cleanAnswer ? 1 : 0);
+            details.true_false.score += (userAnswer === q.correctAnswer ? 1 : 0);
         }
     });
 
@@ -533,7 +543,7 @@ function updateScoreDetails() {
     });
 }
 
-// 显示错题解析
+// 显示错题解析（关键修改）
 function showWrongAnswers() {
     DOM.resultScreen.classList.add('hidden');
     DOM.wrongAnswersScreen.classList.remove('hidden');
@@ -546,14 +556,18 @@ function showWrongAnswers() {
         let isWrong = false;
 
         if (q.type === 'single_choice') {
-            isWrong = userAnswer !== q.cleanAnswer;
+            isWrong = userAnswer !== q.correctAnswer;
         }
         else if (q.type === 'multiple_choice') {
-            const correctAnswers = q.answer.map(index => q.options[index - 1]).sort();
-            const userSelected = Array.isArray(userAnswer) ? [...userAnswer].sort() : [];
-            isWrong = !arraysEqual(correctAnswers, userSelected);
+            if (!Array.isArray(userAnswer)) {
+                isWrong = true;
+            } else {
+                const userSelected = [...userAnswer].sort();
+                const correctAnswers = [...q.correctAnswer].sort();
+                isWrong = !arraysEqual(correctAnswers, userSelected);
+            }
         } else {
-            isWrong = userAnswer !== q.cleanAnswer;
+            isWrong = userAnswer !== q.correctAnswer;
         }
 
         if (isWrong) {
@@ -562,20 +576,17 @@ function showWrongAnswers() {
             wrongItem.classList.add('wrong-item');
 
             let formattedUserAnswer = '';
-            let formattedCorrectAnswer = '';
+            let formattedCorrectAnswer = q.displayAnswer;
 
             if (q.type === 'single_choice') {
                 formattedUserAnswer = userAnswer || '未作答';
-                formattedCorrectAnswer = q.cleanAnswer;
             }
             else if (q.type === 'multiple_choice') {
                 formattedUserAnswer = Array.isArray(userAnswer) 
                     ? userAnswer.join('、') 
                     : '未作答';
-                formattedCorrectAnswer = q.answer.map(index => q.options[index - 1]).join('、');
             } else {
                 formattedUserAnswer = userAnswer || '未作答';
-                formattedCorrectAnswer = q.cleanAnswer;
             }
 
             wrongItem.innerHTML = `
