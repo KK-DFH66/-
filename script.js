@@ -31,7 +31,9 @@ const questionTextElement = document.querySelector('.question-text');
 const optionsContainer = document.querySelector('.options-container');
 const progressBar = document.querySelector('.progress');
 const progressText = document.querySelector('.progress-text');
-const answerSheetContainer = document.querySelector('.answer-sheet-container');
+const singleChoiceGrid = document.getElementById('single-choice-grid');
+const multiChoiceGrid = document.getElementById('multi-choice-grid');
+const judgmentGrid = document.getElementById('judgment-grid');
 const scoreContainer = document.querySelector('.score-container');
 const wrongAnswersContainer = document.querySelector('.wrong-answers-container');
 const questionContainer = document.querySelector('.question-container');
@@ -134,6 +136,7 @@ function startExam() {
     
     startTimer();
     showCurrentQuestion();
+    initAnswerSheet();
 }
 
 // 启动计时器
@@ -212,6 +215,49 @@ function generateRandomExam() {
     userAnswers = new Array(currentExam.length).fill(null);
 }
 
+// 初始化答题卡
+function initAnswerSheet() {
+    singleChoiceGrid.innerHTML = '';
+    multiChoiceGrid.innerHTML = '';
+    judgmentGrid.innerHTML = '';
+    
+    // 单选题答题卡
+    for (let i = 0; i < 100; i++) {
+        const answerItem = document.createElement('div');
+        answerItem.classList.add('answer-sheet-item');
+        answerItem.textContent = i + 1;
+        answerItem.addEventListener('click', () => {
+            currentQuestionIndex = i;
+            exitAnswerSheet();
+        });
+        singleChoiceGrid.appendChild(answerItem);
+    }
+    
+    // 多选题答题卡
+    for (let i = 100; i < 120; i++) {
+        const answerItem = document.createElement('div');
+        answerItem.classList.add('answer-sheet-item');
+        answerItem.textContent = i + 1;
+        answerItem.addEventListener('click', () => {
+            currentQuestionIndex = i;
+            exitAnswerSheet();
+        });
+        multiChoiceGrid.appendChild(answerItem);
+    }
+    
+    // 判断题答题卡
+    for (let i = 120; i < 150; i++) {
+        const answerItem = document.createElement('div');
+        answerItem.classList.add('answer-sheet-item');
+        answerItem.textContent = i + 1;
+        answerItem.addEventListener('click', () => {
+            currentQuestionIndex = i;
+            exitAnswerSheet();
+        });
+        judgmentGrid.appendChild(answerItem);
+    }
+}
+
 // 打乱选项顺序
 function shuffleOptions(options) {
     return [...options].sort(() => Math.random() - 0.5);
@@ -263,6 +309,9 @@ function showCurrentQuestion() {
         optionElement.addEventListener('click', () => selectOption(option));
         optionsContainer.appendChild(optionElement);
     });
+    
+    // 更新答题卡状态
+    updateAnswerSheet();
 }
 
 // 选择答案
@@ -288,48 +337,15 @@ function selectOption(selectedOption) {
     
     // 刷新选项显示
     showCurrentQuestion();
-    // 更新答题卡状态
-    updateAnswerSheet();
 }
 
 // 显示答题卡
 function showAnswerSheet() {
     examScreen.classList.add('hidden');
     answerSheetScreen.classList.remove('hidden');
-    answerSheetContainer.innerHTML = '';
     
-    let answeredCount = 0;
-
-    currentExam.forEach((question, index) => {
-        const userAnswer = userAnswers[index];
-        let isAnswered = false;
-
-        // 统一作答判断逻辑
-        if (question.type === 'multiple_choice') {
-            isAnswered = Array.isArray(userAnswer) && userAnswer.length > 0;
-        } else {
-            isAnswered = userAnswer !== null && userAnswer !== undefined;
-        }
-
-        if (isAnswered) answeredCount++;
-
-        const answerItem = document.createElement('div');
-        answerItem.classList.add('answer-sheet-item');
-        if (isAnswered) {
-            answerItem.classList.add('answered');
-        }
-
-        answerItem.textContent = index + 1;
-
-        answerItem.addEventListener('click', () => {
-            currentQuestionIndex = index;
-            exitAnswerSheet();
-        });
-
-        answerSheetContainer.appendChild(answerItem);
-    });
-
-    document.getElementById('answered-count').textContent = answeredCount;
+    // 更新答题卡状态
+    updateAnswerSheet();
     
     // 更新提交按钮状态
     submitBtn.disabled = !canSubmit;
@@ -338,22 +354,30 @@ function showAnswerSheet() {
 
 // 更新答题卡状态
 function updateAnswerSheet() {
-    const items = answerSheetContainer.querySelectorAll('.answer-sheet-item');
-    if (items.length === 0) return;
+    let answeredCount = 0;
+    const allItems = [
+        ...singleChoiceGrid.querySelectorAll('.answer-sheet-item'),
+        ...multiChoiceGrid.querySelectorAll('.answer-sheet-item'),
+        ...judgmentGrid.querySelectorAll('.answer-sheet-item')
+    ];
     
-    const userAnswer = userAnswers[currentQuestionIndex];
-    let isAnswered = false;
+    allItems.forEach((item, index) => {
+        const userAnswer = userAnswers[index];
+        let isAnswered = false;
+        
+        if (currentExam[index].type === 'multiple_choice') {
+            isAnswered = Array.isArray(userAnswer) && userAnswer.length > 0;
+        } else {
+            isAnswered = userAnswer !== null && userAnswer !== undefined;
+        }
+        
+        item.classList.toggle('answered', isAnswered);
+        
+        if (isAnswered) {
+            answeredCount++;
+        }
+    });
     
-    if (currentExam[currentQuestionIndex].type === 'multiple_choice') {
-        isAnswered = Array.isArray(userAnswer) && userAnswer.length > 0;
-    } else {
-        isAnswered = userAnswer !== null && userAnswer !== undefined;
-    }
-    
-    items[currentQuestionIndex].classList.toggle('answered', isAnswered);
-    
-    // 更新已答题数
-    const answeredCount = [...items].filter(item => item.classList.contains('answered')).length;
     document.getElementById('answered-count').textContent = answeredCount;
 }
 
