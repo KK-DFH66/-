@@ -38,7 +38,11 @@ const DOM = {
     multiChoiceSheet: document.getElementById('multi-choice-sheet'),
     judgmentSheet: document.getElementById('judgment-sheet'),
     answeredCount: document.getElementById('answered-count'),
-    errorMessage: document.getElementById('error-message')
+    errorMessage: document.getElementById('error-message'),
+    wrongCount: document.getElementById('wrong-count'),
+    singleChoiceDetail: document.querySelector('.single-choice .detail-progress'),
+    multiChoiceDetail: document.querySelector('.multiple-choice .detail-progress'),
+    judgmentDetail: document.querySelector('.true-false .detail-progress')
 };
 
 // 初始化应用
@@ -119,6 +123,13 @@ function updateUIState() {
         DOM.errorMessage.classList.remove('hidden');
     } else {
         DOM.errorMessage.classList.add('hidden');
+    }
+    
+    // 交卷按钮状态
+    if (AppState.canSubmit) {
+        DOM.submitBtn.disabled = false;
+    } else {
+        DOM.submitBtn.disabled = true;
     }
 }
 
@@ -217,7 +228,7 @@ function startExam() {
     // 15分钟后允许交卷
     setTimeout(() => {
         AppState.canSubmit = true;
-        DOM.submitBtn.disabled = false;
+        updateUIState();
     }, 15 * 60 * 1000);
     
     startTimer();
@@ -232,6 +243,7 @@ function resetExamState() {
     AppState.score = 0;
     AppState.examTimeLeft = 90 * 60;
     AppState.canSubmit = false;
+    updateUIState();
 }
 
 // 生成随机试卷
