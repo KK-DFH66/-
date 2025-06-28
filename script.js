@@ -246,7 +246,7 @@ function generateRandomExam() {
             // 找到原始正确答案对应的选项文本
             const correctAnswerText = q.answer;
             const correctShuffledIndex = shuffled.findIndex(o => 
-                o.text.endsWith(correctAnswerText) || o.text.includes(correctAnswerText)
+                cleanAnswer(o.text).includes(cleanAnswer(correctAnswerText))
             );
             
             return {
@@ -273,7 +273,7 @@ function generateRandomExam() {
             // 找到原始正确答案对应的选项文本
             const correctAnswers = q.answer.map(a => {
                 const matchOption = shuffled.find(o => 
-                    o.text.endsWith(a) || o.text.includes(a)
+                    cleanAnswer(o.text).includes(cleanAnswer(a))
                 );
                 return matchOption ? matchOption.text : a;
             });
@@ -546,22 +546,26 @@ function calculateScore() {
 
         if (q.type === 'single_choice') {
             // 单选题：答对得0.5分
-            singleChoiceScore += (userAnswer === q.correctAnswer ? 0.5 : 0);
+            const userClean = cleanAnswer(userAnswer);
+            const correctClean = cleanAnswer(q.correctAnswer);
+            singleChoiceScore += (userClean === correctClean ? 0.5 : 0);
         } 
         else if (q.type === 'multiple_choice') {
             if (!Array.isArray(userAnswer)) return;
             
             // 多选题：全部选对得1.5分，否则0分
-            const userSelected = [...userAnswer].sort();
-            const correctAnswers = [...q.correctAnswer].sort();
+            const userClean = userAnswer.map(cleanAnswer).sort();
+            const correctClean = q.correctAnswer.map(cleanAnswer).sort();
             
-            if (arraysEqual(correctAnswers, userSelected)) {
+            if (arraysEqual(correctClean, userClean)) {
                 multiChoiceScore += 1.5;
             }
         } 
         else if (q.type === 'true_false') {
             // 判断题：答对得1分
-            judgmentScore += (userAnswer === q.correctAnswer ? 1 : 0);
+            const userClean = cleanAnswer(userAnswer);
+            const correctClean = cleanAnswer(q.correctAnswer);
+            judgmentScore += (userClean === correctClean ? 1 : 0);
         }
     });
 
@@ -581,20 +585,24 @@ function updateScoreDetails() {
         if (!userAnswer) return;
 
         if (q.type === 'single_choice') {
-            details.single_choice.score += (userAnswer === q.correctAnswer ? 0.5 : 0);
+            const userClean = cleanAnswer(userAnswer);
+            const correctClean = cleanAnswer(q.correctAnswer);
+            details.single_choice.score += (userClean === correctClean ? 0.5 : 0);
         }
         else if (q.type === 'multiple_choice') {
             if (!Array.isArray(userAnswer)) return;
             
-            const userSelected = [...userAnswer].sort();
-            const correctAnswers = [...q.correctAnswer].sort();
+            const userClean = userAnswer.map(cleanAnswer).sort();
+            const correctClean = q.correctAnswer.map(cleanAnswer).sort();
             
-            if (arraysEqual(correctAnswers, userSelected)) {
+            if (arraysEqual(correctClean, userClean)) {
                 details.multiple_choice.score += 1.5;
             }
         }
         else if (q.type === 'true_false') {
-            details.true_false.score += (userAnswer === q.correctAnswer ? 1 : 0);
+            const userClean = cleanAnswer(userAnswer);
+            const correctClean = cleanAnswer(q.correctAnswer);
+            details.true_false.score += (userClean === correctClean ? 1 : 0);
         }
     });
 
@@ -623,12 +631,21 @@ function showWrongAnswers() {
 
         // 判断是否答错
         if (q.type === 'single_choice') {
-            isWrong = userAnswer !== q.correctAnswer;
+            const userClean = cleanAnswer(userAnswer);
+            const correctClean = cleanAnswer(q.correctAnswer);
+            isWrong = userClean !== correctClean;
         } else if (q.type === 'multiple_choice') {
-            isWrong = !Array.isArray(userAnswer) || 
-                !arraysEqual([...userAnswer].sort(), [...q.correctAnswer].sort());
+            if (!Array.isArray(userAnswer)) {
+                isWrong = true;
+            } else {
+                const userClean = userAnswer.map(cleanAnswer).sort();
+                const correctClean = q.correctAnswer.map(cleanAnswer).sort();
+                isWrong = !arraysEqual(userClean, correctClean);
+            }
         } else {
-            isWrong = userAnswer !== q.correctAnswer;
+            const userClean = cleanAnswer(userAnswer);
+            const correctClean = cleanAnswer(q.correctAnswer);
+            isWrong = userClean !== correctClean;
         }
 
         if (!isWrong) return;
@@ -647,7 +664,7 @@ function showWrongAnswers() {
                 <p>${q.question}</p>
             </div>
             <div class="wrong-answer">
-                <p>你的答案: <span class="user-wrong">${formattedUserAnswer}</span></p>
+                <p>你的答案: <span class="user-answer">${formattedUserAnswer}</span></p>
                 <p>正确答案: <span class="correct-answer">${q.displayAnswer}</span></p>
             </div>
             ${q.explanation ? `<div class="explanation">解析: ${q.explanation}</div>` : ''}
@@ -670,9 +687,8 @@ function arraysEqual(a, b) {
     if (!Array.isArray(a) || !Array.isArray(b)) return false;
     if (a.length !== b.length) return false;
     
-    const sortedA = [...a].sort();
-    const sortedB = [...b].sort();
-    return sortedA.every((val, i) => val === sortedB[i]);
+    // 比较清理后的答案（忽略格式差异）
+    return a.every((val, i) => val === b[i]);
 }
 
 // 辅助函数：获取题型文本
@@ -683,6 +699,19 @@ function getQuestionTypeText(type) {
         'true_false': '判断题'
     };
     return types[type] || '';
+}
+
+// 辅助函数：清理答案格式（去除编号、标点、空格，统一小写）
+function cleanAnswer(answer) {
+    if (!answer) return '';
+    
+    // 去除选项编号（如"A、" "B." "1."等）
+    const removePrefix = answer.replace(/^[A-Za-z0-9一二三四五六七八九十]+[、.\s]?/, '');
+    
+    // 去除特殊符号，保留中文、英文、数字
+    return removePrefix
+        .replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, '')
+        .toLowerCase();
 }
 
 // 启动应用
