@@ -6,7 +6,7 @@ const AppState = {
     userAnswers: [],
     score: 0,
     examTimer: null,
-    examTimeLeft: 1 * 60, // 改为1分钟考试时间
+    examTimeLeft: 90 * 60, // 90分钟考试时间
     canSubmit: false,
     isMobile: /Mobi|Android/i.test(navigator.userAgent),
     initialized: false,
@@ -190,11 +190,11 @@ function startExam() {
     DOM.resultScreen.classList.add('hidden');
     DOM.wrongAnswersScreen.classList.add('hidden');
     
-    // 5秒钟后允许交卷
+    // 5分钟后允许交卷
     setTimeout(() => {
         AppState.canSubmit = true;
         updateUIState();
-    }, 5 * 1000);
+    }, 5 * 60 * 1000);
     
     startTimer();
     showCurrentQuestion();
@@ -206,7 +206,7 @@ function resetExamState() {
     AppState.currentQuestionIndex = 0;
     AppState.userAnswers = new Array(150).fill(null);
     AppState.score = 0;
-    AppState.examTimeLeft = 1 * 60;
+    AppState.examTimeLeft = 90 * 60;
     AppState.canSubmit = false;
     updateUIState();
 }
@@ -220,19 +220,13 @@ function generateRandomExam() {
         .sort(() => Math.random() - 0.5)
         .slice(0, 100)
         .map(q => {
-            const optionsWithKeys = q.options.map(o => ({
-                letter: o.split("、")[0],
-                text: o
-            }));
-            const shuffled = shuffleOptions(optionsWithKeys);
-            const correctAnswer = q.options.find(o => o.startsWith(q.answer)).trim();
-
+            // 保持选项顺序不变，只记录正确答案
             return {
                 ...q,
                 type: 'single_choice',
-                shuffledOptions: shuffled.map(o => o.text),
-                correctAnswer,
-                displayAnswer: correctAnswer
+                shuffledOptions: [...q.options], // 保持原顺序
+                correctAnswer: q.options.find(opt => opt.startsWith(q.answer + "、")),
+                displayAnswer: q.options.find(opt => opt.startsWith(q.answer + "、"))
             };
         });
 
@@ -241,19 +235,14 @@ function generateRandomExam() {
         .sort(() => Math.random() - 0.5)
         .slice(0, 20)
         .map(q => {
-            const optionsWithKeys = q.options.map(o => ({
-                letter: o.split("、")[0],
-                text: o
-            }));
-            const shuffled = shuffleOptions(optionsWithKeys);
+            // 保持选项顺序不变，只记录正确答案
             const correctAnswers = q.answer.map(a => 
-                q.options.find(o => o.startsWith(a)).trim()
+                q.options.find(opt => opt.startsWith(a + "、"))
             );
-
             return {
                 ...q,
                 type: 'multiple_choice',
-                shuffledOptions: shuffled.map(o => o.text),
+                shuffledOptions: [...q.options], // 保持原顺序
                 correctAnswer: correctAnswers,
                 displayAnswer: correctAnswers.join('、')
             };
@@ -273,16 +262,6 @@ function generateRandomExam() {
 
     AppState.currentExam = [...singleChoices, ...multiChoices, ...judgments];
     AppState.userAnswers = new Array(AppState.currentExam.length).fill(null);
-}
-
-// 打乱选项顺序
-function shuffleOptions(options) {
-    const arr = [...options];
-    for (let i = arr.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [arr[i], arr[j]] = [arr[j], arr[i]];
-    }
-    return arr;
 }
 
 // 显示当前题目
@@ -443,8 +422,8 @@ function startTimer() {
         timerDisplay.textContent = timeString;
         sheetTimerDisplay.textContent = timeString;
         
-        // 最后30秒闪烁提醒
-        if (AppState.examTimeLeft <= 30) {
+        // 最后5分钟闪烁提醒
+        if (AppState.examTimeLeft <= 5 * 60) {
             timerDisplay.style.color = '#e74c3c';
             timerDisplay.classList.add('blink');
             sheetTimerDisplay.style.color = '#e74c3c';
@@ -462,7 +441,7 @@ function startTimer() {
 // 处理交卷
 function handleSubmit() {
     if (!AppState.canSubmit) {
-        alert('考试开始5秒钟后才能交卷！');
+        alert('考试开始5分钟后才能交卷！');
         return;
     }
     showResult();
@@ -539,7 +518,7 @@ function updateScoreDetails() {
             const userSelected = [...userAnswer].sort();
             const correctAnswers = [...q.correctAnswer].sort();
             
-            if (arraysEqual(correctAnswers, userSelected))) {
+            if (arraysEqual(correctAnswers, userSelected)) {
                 details.multiple_choice.score += 1;
             } else if (userSelected.some(ans => correctAnswers.includes(ans))) {
                 details.multiple_choice.score += 0.5;
