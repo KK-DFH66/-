@@ -61,7 +61,20 @@
                 </div>
                 <p>共150题，当前已作答 <span id="answered-count">0</span> 题</p>
             </div>
-            <div class="answer-sheet-container"></div>
+            <div class="answer-sheet-container">
+                <div class="section-group">
+                    <h3 class="section-title">单选题 (1-100)</h3>
+                    <div class="question-grid" id="single-choice-grid"></div>
+                </div>
+                <div class="section-group">
+                    <h3 class="section-title">多选题 (101-120)</h3>
+                    <div class="question-grid" id="multi-choice-grid"></div>
+                </div>
+                <div class="section-group">
+                    <h3 class="section-title">判断题 (121-150)</h3>
+                    <div class="question-grid" id="judgment-grid"></div>
+                </div>
+            </div>
             <div class="preview-footer">
                 <button id="exit-sheet-btn" class="secondary-btn">返回答题</button>
                 <button id="submit-btn" class="primary-btn" disabled>确认交卷</button>
