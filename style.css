@@ -111,26 +111,12 @@ button:disabled {
     border-bottom: 1px solid #eee;
 }
 
-.exam-info ul {
-    list-style-type: none;
+.exam-info ol, .exam-info ul {
+    margin-left: 20px;
 }
 
 .exam-info li {
-    margin-bottom: 10px;
-    padding-left: 20px;
-    position: relative;
-}
-
-.exam-info li:before {
-    content: "•";
-    color: var(--primary-color);
-    position: absolute;
-    left: 0;
-}
-
-.exam-info ul ul {
-    margin-top: 5px;
-    margin-left: 20px;
+    margin-bottom: 8px;
 }
 
 .notice {
@@ -151,7 +137,7 @@ button:disabled {
     height: 20px;
     background-color: var(--light-gray);
     border-radius: 10px;
-    margin-bottom: 25px;
+    margin-bottom: 15px;
     position: relative;
     overflow: hidden;
 }
@@ -170,6 +156,15 @@ button:disabled {
     transform: translateY(-50%);
     font-size: 12px;
     color: #fff;
+}
+
+.section-title {
+    font-size: 18px;
+    font-weight: bold;
+    color: var(--primary-color);
+    padding: 8px 0;
+    margin-bottom: 10px;
+    border-bottom: 2px solid var(--primary-color);
 }
 
 .question-container {
@@ -222,6 +217,15 @@ button:disabled {
 
 .nav-btn {
     min-width: 120px;
+}
+
+.nav-btn.section-end {
+    background-color: var(--secondary-color);
+    color: white;
+}
+
+.nav-btn.section-end:hover {
+    background-color: var(--secondary-hover);
 }
 
 /* 预览界面 */
@@ -348,6 +352,10 @@ button:disabled {
     font-weight: bold;
     background-color: var(--success-color);
     color: white;
+}
+
+.fail-badge {
+    background-color: var(--danger-color);
 }
 
 .score-details {
@@ -501,5 +509,9 @@ button:disabled {
     
     .option {
         padding: 12px 15px;
+    }
+    
+    .section-title {
+        font-size: 16px;
     }
 }
