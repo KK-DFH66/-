@@ -37,7 +37,10 @@
                 <div class="progress"></div>
                 <span class="progress-text">0/150</span>
             </div>
-            <div id="section-title" class="section-title"></div>
+            <div class="exam-header">
+                <div id="section-title" class="section-title"></div>
+                <button id="answer-sheet-btn" class="secondary-btn">答题卡</button>
+            </div>
             <div class="question-container">
                 <div class="question-meta">
                     <span class="question-type"></span>
@@ -46,15 +49,11 @@
                 <div class="question-text"></div>
                 <div class="options-container"></div>
             </div>
-            <div class="navigation-btns">
-                <button id="prev-btn" class="nav-btn">上一题</button>
-                <button id="next-btn" class="nav-btn">下一题</button>
-            </div>
         </div>
 
-        <!-- 预览界面 -->
-        <div id="review-screen" class="screen hidden">
-            <h2>答题情况预览</h2>
+        <!-- 答题卡界面 -->
+        <div id="answer-sheet-screen" class="screen hidden">
+            <h2>答题卡</h2>
             <div class="preview-header">
                 <div class="legend">
                     <span class="answered"><i></i>已作答</span>
@@ -62,9 +61,9 @@
                 </div>
                 <p>共150题，当前已作答 <span id="answered-count">0</span> 题</p>
             </div>
-            <div class="preview-container"></div>
+            <div class="answer-sheet-container"></div>
             <div class="preview-footer">
-                <button id="exit-preview-btn" class="secondary-btn">返回答题</button>
+                <button id="exit-sheet-btn" class="secondary-btn">返回答题</button>
                 <button id="submit-btn" class="primary-btn" disabled>确认交卷</button>
             </div>
         </div>
