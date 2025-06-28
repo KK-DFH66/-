@@ -243,18 +243,20 @@ function generateRandomExam() {
             }));
             const shuffled = shuffleOptions(optionsWithKeys);
             
-            // 找到原始正确答案对应的选项文本
+            // 直接使用原始正确答案
             const correctAnswerText = q.answer;
+            
+            // 找到原始正确答案在打乱后的选项中的位置
             const correctShuffledIndex = shuffled.findIndex(o => 
-                cleanAnswer(o.text).includes(cleanAnswer(correctAnswerText))
+                cleanAnswer(o.text) === cleanAnswer(correctAnswerText)
             );
             
             return {
                 ...q,
                 type: 'single_choice',
                 shuffledOptions: shuffled.map(o => o.text),
-                correctAnswer: shuffled[correctShuffledIndex]?.text || q.answer,
-                displayAnswer: shuffled[correctShuffledIndex]?.text || q.answer,
+                correctAnswer: correctAnswerText, // 存储原始正确答案
+                displayAnswer: shuffled[correctShuffledIndex]?.text || correctAnswerText, // 显示带新编号的正确答案
                 correctIndex: correctShuffledIndex
             };
         });
@@ -270,25 +272,28 @@ function generateRandomExam() {
             }));
             const shuffled = shuffleOptions(optionsWithKeys);
             
-            // 找到原始正确答案对应的选项文本
-            const correctAnswers = q.answer.map(a => {
+            // 直接使用原始正确答案数组
+            const correctAnswers = q.answer;
+            
+            // 找到原始正确答案在打乱后的选项中的对应文本
+            const matchedAnswers = correctAnswers.map(ca => {
                 const matchOption = shuffled.find(o => 
-                    cleanAnswer(o.text).includes(cleanAnswer(a))
+                    cleanAnswer(o.text) === cleanAnswer(ca)
                 );
-                return matchOption ? matchOption.text : a;
+                return matchOption ? matchOption.text : ca;
             });
             
             // 找到打乱后正确答案的索引
-            const correctShuffledIndices = correctAnswers.map(ca => 
-                shuffled.findIndex(o => o.text === ca)
+            const correctShuffledIndices = matchedAnswers.map(ma => 
+                shuffled.findIndex(o => o.text === ma)
             );
             
             return {
                 ...q,
                 type: 'multiple_choice',
                 shuffledOptions: shuffled.map(o => o.text),
-                correctAnswer: correctAnswers,
-                displayAnswer: correctAnswers.join('、'),
+                correctAnswer: correctAnswers, // 存储原始正确答案数组
+                displayAnswer: matchedAnswers.join('、'), // 显示带新编号的正确答案
                 correctIndices: correctShuffledIndices
             };
         });
@@ -665,7 +670,7 @@ function showWrongAnswers() {
             </div>
             <div class="wrong-answer">
                 <p>你的答案: <span class="user-answer">${formattedUserAnswer}</span></p>
-                <p>正确答案: <span class="correct-answer">${q.displayAnswer}</span></p>
+                <p>正确答案: <span class="correct-answer">${q.correctAnswer}</span></p>
             </div>
             ${q.explanation ? `<div class="explanation">解析: ${q.explanation}</div>` : ''}
         `;
