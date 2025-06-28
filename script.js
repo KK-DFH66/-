@@ -6,7 +6,7 @@ const AppState = {
     userAnswers: [],
     score: 0,
     examTimer: null,
-    examTimeLeft: 90 * 60, // 90分钟考试时间
+    examTimeLeft: 2 * 60, // 2分钟考试时间
     canSubmit: false,
     isMobile: /Mobi|Android/i.test(navigator.userAgent),
     initialized: false,
@@ -190,11 +190,11 @@ function startExam() {
     DOM.resultScreen.classList.add('hidden');
     DOM.wrongAnswersScreen.classList.add('hidden');
     
-    // 5分钟后允许交卷
+    // 30秒后允许交卷
     setTimeout(() => {
         AppState.canSubmit = true;
         updateUIState();
-    }, 5 * 60 * 1000);
+    }, 30 * 1000);
     
     startTimer();
     showCurrentQuestion();
@@ -206,7 +206,7 @@ function resetExamState() {
     AppState.currentQuestionIndex = 0;
     AppState.userAnswers = new Array(150).fill(null);
     AppState.score = 0;
-    AppState.examTimeLeft = 90 * 60;
+    AppState.examTimeLeft = 2 * 60; // 2分钟
     AppState.canSubmit = false;
     updateUIState();
 }
@@ -215,40 +215,63 @@ function resetExamState() {
 function generateRandomExam() {
     AppState.currentExam = [];
     
-    // 处理单选题
+    // 处理单选题 - 随机选择100题
     const singleChoices = [...AppState.examData.single_choice]
         .sort(() => Math.random() - 0.5)
         .slice(0, 100)
         .map(q => {
-            // 保持选项顺序不变，只记录正确答案
+            const optionsWithKeys = q.options.map((o, index) => ({
+                originalIndex: index,
+                text: o
+            }));
+            const shuffled = shuffleOptions(optionsWithKeys);
+            const correctAnswerIndex = q.options.findIndex(o => o.startsWith(q.answer + "、"));
+            const correctAnswerText = q.options[correctAnswerIndex];
+            const correctShuffledIndex = shuffled.findIndex(o => o.text === correctAnswerText);
+            
             return {
                 ...q,
                 type: 'single_choice',
-                shuffledOptions: [...q.options], // 保持原顺序
-                correctAnswer: q.options.find(opt => opt.startsWith(q.answer + "、")),
-                displayAnswer: q.options.find(opt => opt.startsWith(q.answer + "、"))
+                shuffledOptions: shuffled.map(o => o.text),
+                correctAnswer: correctAnswerText,
+                displayAnswer: correctAnswerText,
+                correctIndex: correctShuffledIndex
             };
         });
 
-    // 处理多选题
+    // 处理多选题 - 随机选择20题
     const multiChoices = [...AppState.examData.multiple_choice]
         .sort(() => Math.random() - 0.5)
         .slice(0, 20)
         .map(q => {
-            // 保持选项顺序不变，只记录正确答案
-            const correctAnswers = q.answer.map(a => 
-                q.options.find(opt => opt.startsWith(a + "、"))
+            const optionsWithKeys = q.options.map((o, index) => ({
+                originalIndex: index,
+                text: o
+            }));
+            const shuffled = shuffleOptions(optionsWithKeys);
+            
+            // 找到原始正确答案对应的选项文本
+            const correctAnswers = q.answer.map(a => {
+                const originalIndex = q.options.findIndex(o => o.startsWith(a + "、"));
+                return q.options[originalIndex];
+            });
+            
+            // 找到打乱后正确答案的索引
+            const correctShuffledIndices = correctAnswers.map(ca => 
+                shuffled.findIndex(o => o.text === ca)
             );
+            
             return {
                 ...q,
                 type: 'multiple_choice',
-                shuffledOptions: [...q.options], // 保持原顺序
+                shuffledOptions: shuffled.map(o => o.text),
                 correctAnswer: correctAnswers,
-                displayAnswer: correctAnswers.join('、')
+                displayAnswer: correctAnswers.join('、'),
+                correctIndices: correctShuffledIndices
             };
         });
 
-    // 处理判断题
+    // 处理判断题 - 随机选择30题
     const judgments = [...AppState.examData.true_false]
         .sort(() => Math.random() - 0.5)
         .slice(0, 30)
@@ -262,6 +285,16 @@ function generateRandomExam() {
 
     AppState.currentExam = [...singleChoices, ...multiChoices, ...judgments];
     AppState.userAnswers = new Array(AppState.currentExam.length).fill(null);
+}
+
+// 打乱选项顺序
+function shuffleOptions(options) {
+    const arr = [...options];
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
 }
 
 // 显示当前题目
@@ -291,7 +324,7 @@ function showCurrentQuestion() {
     
     // 清空并重建选项
     DOM.optionsContainer.innerHTML = '';
-    question.shuffledOptions.forEach(option => {
+    question.shuffledOptions.forEach((option, index) => {
         const optionElement = document.createElement('div');
         optionElement.classList.add('option');
         optionElement.textContent = option;
@@ -422,8 +455,8 @@ function startTimer() {
         timerDisplay.textContent = timeString;
         sheetTimerDisplay.textContent = timeString;
         
-        // 最后5分钟闪烁提醒
-        if (AppState.examTimeLeft <= 5 * 60) {
+        // 最后30秒闪烁提醒
+        if (AppState.examTimeLeft <= 30) {
             timerDisplay.style.color = '#e74c3c';
             timerDisplay.classList.add('blink');
             sheetTimerDisplay.style.color = '#e74c3c';
@@ -441,7 +474,7 @@ function startTimer() {
 // 处理交卷
 function handleSubmit() {
     if (!AppState.canSubmit) {
-        alert('考试开始5分钟后才能交卷！');
+        alert('考试开始30秒后才能交卷！');
         return;
     }
     showResult();
@@ -475,21 +508,22 @@ function calculateScore() {
         if (!userAnswer) return;
 
         if (q.type === 'single_choice') {
+            // 单选题：答对得0.5分
             singleChoiceScore += (userAnswer === q.correctAnswer ? 0.5 : 0);
         } 
         else if (q.type === 'multiple_choice') {
             if (!Array.isArray(userAnswer)) return;
             
+            // 多选题：全部选对得1.5分，否则0分
             const userSelected = [...userAnswer].sort();
             const correctAnswers = [...q.correctAnswer].sort();
             
             if (arraysEqual(correctAnswers, userSelected)) {
-                multiChoiceScore += 1;
-            } else if (userSelected.some(ans => correctAnswers.includes(ans))) {
-                multiChoiceScore += 0.5;
+                multiChoiceScore += 1.5;
             }
         } 
         else if (q.type === 'true_false') {
+            // 判断题：答对得1分
             judgmentScore += (userAnswer === q.correctAnswer ? 1 : 0);
         }
     });
@@ -501,7 +535,7 @@ function calculateScore() {
 function updateScoreDetails() {
     const details = {
         'single_choice': { score: 0, max: 50 },
-        'multiple_choice': { score: 0, max: 20 },
+        'multiple_choice': { score: 0, max: 30 }, // 20题×1.5分=30分
         'true_false': { score: 0, max: 30 }
     };
 
@@ -519,9 +553,7 @@ function updateScoreDetails() {
             const correctAnswers = [...q.correctAnswer].sort();
             
             if (arraysEqual(correctAnswers, userSelected)) {
-                details.multiple_choice.score += 1;
-            } else if (userSelected.some(ans => correctAnswers.includes(ans))) {
-                details.multiple_choice.score += 0.5;
+                details.multiple_choice.score += 1.5;
             }
         }
         else if (q.type === 'true_false') {
