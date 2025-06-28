@@ -172,6 +172,7 @@ button:disabled {
     color: var(--primary-color);
     padding: 8px 0;
     margin-bottom: 10px;
+    border-bottom: 2px solid var(--primary-color);
 }
 
 .question-container {
@@ -263,18 +264,35 @@ button:disabled {
     flex-grow: 1;
     overflow-y: auto;
     margin-bottom: 20px;
+}
+
+.section-group {
+    margin-bottom: 30px;
+}
+
+.section-group .section-title {
+    font-size: 16px;
+    color: var(--secondary-color);
+    border-bottom: none;
+    padding: 5px 0;
+    margin-bottom: 10px;
+}
+
+.question-grid {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 10px;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 8px;
+    margin-bottom: 15px;
 }
 
 .answer-sheet-item {
-    padding: 10px;
+    padding: 8px;
     text-align: center;
     border-radius: var(--border-radius);
     cursor: pointer;
     transition: all 0.2s ease;
     background-color: var(--light-gray);
+    font-size: 14px;
 }
 
 .answer-sheet-item.answered {
@@ -480,13 +498,13 @@ button:disabled {
         font-size: 16px;
     }
     
-    .answer-sheet-container {
-        grid-template-columns: repeat(4, 1fr);
+    .question-grid {
+        grid-template-columns: repeat(5, 1fr);
     }
 }
 
 @media (max-width: 480px) {
-    .answer-sheet-container {
-        grid-template-columns: repeat(3, 1fr);
+    .question-grid {
+        grid-template-columns: repeat(4, 1fr);
     }
 }
