@@ -6,7 +6,7 @@ const AppState = {
     userAnswers: [],
     score: 0,
     examTimer: null,
-    examTimeLeft: 90 * 60,
+    examTimeLeft: 90 * 60, // 90分钟考试时间
     canSubmit: false,
     isMobile: /Mobi|Android/i.test(navigator.userAgent),
     initialized: false,
@@ -48,20 +48,17 @@ async function initApp() {
     if (AppState.initialized || AppState.loading) return;
     
     AppState.loading = true;
-    AppState.error = null;
     updateUIState();
     
     try {
         const response = await fetch('exam.json');
         if (!response.ok) throw new Error(`题库加载失败 (HTTP ${response.status})`);
-        
         const data = await response.json();
-        validateExamData(data);
         
+        if (!validateExamData(data)) throw new Error('题库格式验证失败');
         AppState.examData = data;
         AppState.initialized = true;
         bindEventListeners();
-        
     } catch (error) {
         AppState.error = error;
         showError(error.message);
@@ -74,21 +71,13 @@ async function initApp() {
 // 题库验证
 function validateExamData(data) {
     const requiredTypes = ['single_choice', 'multiple_choice', 'true_false'];
-    const minCounts = {
-        single_choice: 100,
-        multiple_choice: 20,
-        true_false: 30
-    };
+    const minCounts = { single_choice: 100, multiple_choice: 20, true_false: 30 };
     
-    requiredTypes.forEach(type => {
-        if (!data[type]) throw new Error(`缺少必要题型: ${type}`);
-        if (!Array.isArray(data[type])) throw new Error(`${type} 题型必须为数组`);
-    });
-    
-    Object.entries(minCounts).forEach(([type, min]) => {
-        if (data[type].length < min) {
-            throw new Error(`${type} 题目数量不足 (需要至少 ${min} 题)`);
+    return requiredTypes.every(type => {
+        if (!data[type] || !Array.isArray(data[type])) {
+            throw new Error(`无效的题型格式: ${type}`);
         }
+        return data[type].length >= minCounts[type];
     });
 }
 
@@ -141,6 +130,7 @@ function bindEventListeners() {
     });
     DOM.newExamBtn.addEventListener('click', startExam);
     
+    // 按钮点击效果
     DOM.startBtn.addEventListener('mousedown', () => {
         DOM.startBtn.style.transform = 'scale(0.98)';
     });
@@ -151,6 +141,7 @@ function bindEventListeners() {
         DOM.startBtn.style.transform = '';
     });
     
+    // 移动端手势支持
     if (AppState.isMobile) {
         DOM.examScreen.addEventListener('touchstart', handleTouchStart, false);
         DOM.examScreen.addEventListener('touchend', handleTouchEnd, false);
@@ -199,6 +190,7 @@ function startExam() {
     DOM.resultScreen.classList.add('hidden');
     DOM.wrongAnswersScreen.classList.add('hidden');
     
+    // 5分钟后允许交卷
     setTimeout(() => {
         AppState.canSubmit = true;
         updateUIState();
@@ -219,54 +211,55 @@ function resetExamState() {
     updateUIState();
 }
 
-// 生成随机试卷（关键修改）
+// 生成随机试卷（核心函数）
 function generateRandomExam() {
     AppState.currentExam = [];
     
-    // 单选题处理
+    // 处理单选题
     const singleChoices = [...AppState.examData.single_choice]
         .sort(() => Math.random() - 0.5)
         .slice(0, 100)
         .map(q => {
-            const shuffledOptions = shuffleOptions([...q.options]);
-            
-            // 获取原始正确答案（如"C、粘度问题"）
-            const correctOption = q.options.find(opt => opt.startsWith(q.answer + "、"));
-            const correctIndex = q.options.indexOf(correctOption);
-            const correctAnswer = shuffledOptions[correctIndex];
-            
+            const optionsWithKeys = q.options.map(o => ({
+                letter: o.split("、")[0],
+                text: o
+            }));
+            const shuffled = shuffleOptions(optionsWithKeys);
+            const correctAnswer = shuffled.find(o => o.letter === q.answer).text;
+
             return {
                 ...q,
                 type: 'single_choice',
-                shuffledOptions: shuffledOptions,
-                correctAnswer: correctAnswer,
-                displayAnswer: correctAnswer // 存储完整答案文本
+                shuffledOptions: shuffled.map(o => o.text),
+                correctAnswer,
+                displayAnswer: correctAnswer
             };
         });
-    
-    // 多选题处理
+
+    // 处理多选题
     const multiChoices = [...AppState.examData.multiple_choice]
         .sort(() => Math.random() - 0.5)
         .slice(0, 20)
         .map(q => {
-            const shuffledOptions = shuffleOptions([...q.options]);
-            
-            // 获取所有正确答案的完整文本
-            const correctAnswers = q.answer.map(ans => {
-                const correctOption = q.options.find(opt => opt.startsWith(ans + "、"));
-                return shuffledOptions[q.options.indexOf(correctOption)];
-            });
-            
+            const optionsWithKeys = q.options.map(o => ({
+                letter: o.split("、")[0],
+                text: o
+            }));
+            const shuffled = shuffleOptions(optionsWithKeys);
+            const correctAnswers = q.answer.map(a => 
+                shuffled.find(o => o.letter === a).text
+            );
+
             return {
                 ...q,
                 type: 'multiple_choice',
-                shuffledOptions: shuffledOptions,
+                shuffledOptions: shuffled.map(o => o.text),
                 correctAnswer: correctAnswers,
-                displayAnswer: correctAnswers.join('、') // 用顿号连接多个答案
+                displayAnswer: correctAnswers.join('、')
             };
         });
-    
-    // 判断题处理
+
+    // 处理判断题
     const judgments = [...AppState.examData.true_false]
         .sort(() => Math.random() - 0.5)
         .slice(0, 30)
@@ -277,18 +270,19 @@ function generateRandomExam() {
             correctAnswer: q.answer ? '正确' : '错误',
             displayAnswer: q.answer ? '正确' : '错误'
         }));
-    
+
     AppState.currentExam = [...singleChoices, ...multiChoices, ...judgments];
     AppState.userAnswers = new Array(AppState.currentExam.length).fill(null);
 }
 
 // 打乱选项顺序
 function shuffleOptions(options) {
-    for (let i = options.length - 1; i > 0; i--) {
+    const arr = [...options];
+    for (let i = arr.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [options[i], options[j]] = [options[j], options[i]];
+        [arr[i], arr[j]] = [arr[j], arr[i]];
     }
-    return options;
+    return arr;
 }
 
 // 显示当前题目
@@ -296,9 +290,11 @@ function showCurrentQuestion() {
     const question = AppState.currentExam[AppState.currentQuestionIndex];
     const totalQuestions = AppState.currentExam.length;
     
+    // 更新进度条
     DOM.progressBar.style.width = `${(AppState.currentQuestionIndex + 1) / totalQuestions * 100}%`;
     DOM.progressText.textContent = `${AppState.currentQuestionIndex + 1}/${totalQuestions}`;
     
+    // 更新板块标题
     let sectionTitle = '';
     if (AppState.currentQuestionIndex < 100) {
         sectionTitle = '单选题板块 (1-100)';
@@ -309,16 +305,19 @@ function showCurrentQuestion() {
     }
     DOM.sectionTitle.textContent = sectionTitle;
     
+    // 显示题目信息
     DOM.questionType.textContent = question.type === 'single_choice' ? '单选题' : 
                                  question.type === 'multiple_choice' ? '多选题' : '判断题';
     DOM.questionText.textContent = `${AppState.currentQuestionIndex + 1}. ${question.question}`;
     
+    // 清空并重建选项
     DOM.optionsContainer.innerHTML = '';
     question.shuffledOptions.forEach(option => {
         const optionElement = document.createElement('div');
         optionElement.classList.add('option');
         optionElement.textContent = option;
         
+        // 设置选中状态
         if (question.type === 'multiple_choice') {
             if (Array.isArray(AppState.userAnswers[AppState.currentQuestionIndex])) {
                 optionElement.classList.toggle('selected', 
@@ -329,6 +328,7 @@ function showCurrentQuestion() {
                 AppState.userAnswers[AppState.currentQuestionIndex] === option);
         }
         
+        // 添加点击事件
         optionElement.addEventListener('click', () => selectOption(option));
         DOM.optionsContainer.appendChild(optionElement);
     });
@@ -359,7 +359,7 @@ function selectOption(selectedOption) {
     updateAnswerSheet();
 }
 
-// 上一题
+// 显示上一题
 function showPreviousQuestion() {
     if (AppState.currentQuestionIndex > 0) {
         AppState.currentQuestionIndex--;
@@ -367,7 +367,7 @@ function showPreviousQuestion() {
     }
 }
 
-// 下一题
+// 显示下一题
 function showNextQuestion() {
     if (AppState.currentQuestionIndex < AppState.currentExam.length - 1) {
         AppState.currentQuestionIndex++;
@@ -397,6 +397,7 @@ function updateAnswerSheet() {
         sheetNumber.classList.add('sheet-number');
         sheetNumber.textContent = index + 1;
         
+        // 设置答题状态
         const isAnswered = question.type === 'multiple_choice' 
             ? Array.isArray(AppState.userAnswers[index]) && AppState.userAnswers[index].length > 0
             : AppState.userAnswers[index] !== null;
@@ -404,6 +405,7 @@ function updateAnswerSheet() {
         if (isAnswered) sheetNumber.classList.add('answered');
         if (index === AppState.currentQuestionIndex) sheetNumber.classList.add('current');
         
+        // 添加点击事件
         sheetNumber.addEventListener('click', () => {
             AppState.currentQuestionIndex = index;
             DOM.answerSheetScreen.classList.add('hidden');
@@ -411,6 +413,7 @@ function updateAnswerSheet() {
             showCurrentQuestion();
         });
         
+        // 添加到对应区域
         if (index < 100) {
             DOM.singleChoiceSheet.appendChild(sheetNumber);
         } else if (index < 120) {
@@ -440,6 +443,7 @@ function startTimer() {
         timerDisplay.textContent = timeString;
         sheetTimerDisplay.textContent = timeString;
         
+        // 最后5分钟闪烁提醒
         if (AppState.examTimeLeft <= 5 * 60) {
             timerDisplay.style.color = '#e74c3c';
             timerDisplay.classList.add('blink');
@@ -447,6 +451,7 @@ function startTimer() {
             sheetTimerDisplay.classList.add('blink');
         }
         
+        // 考试时间结束
         if (AppState.examTimeLeft <= 0) {
             clearInterval(AppState.examTimer);
             showResult();
@@ -463,7 +468,7 @@ function handleSubmit() {
     showResult();
 }
 
-// 显示结果
+// 显示考试结果
 function showResult() {
     clearInterval(AppState.examTimer);
     calculateScore();
@@ -545,6 +550,7 @@ function updateScoreDetails() {
         }
     });
 
+    // 更新UI
     Object.keys(details).forEach(type => {
         const typeKey = type.replace('_', '-');
         const progress = details[type].score / details[type].max * 100;
@@ -554,89 +560,81 @@ function updateScoreDetails() {
     });
 }
 
-// 显示错题解析（关键修改）
+// 显示错题解析
 function showWrongAnswers() {
     DOM.resultScreen.classList.add('hidden');
     DOM.wrongAnswersScreen.classList.remove('hidden');
-    document.querySelector('.wrong-answers-container').innerHTML = '<h3>错题解析</h3>';
-
+    
+    const container = document.querySelector('.wrong-answers-container');
+    container.innerHTML = '<h3>错题解析</h3>';
     let wrongCount = 0;
 
     AppState.currentExam.forEach((q, idx) => {
         const userAnswer = AppState.userAnswers[idx];
         let isWrong = false;
 
+        // 判断是否答错
         if (q.type === 'single_choice') {
             isWrong = userAnswer !== q.correctAnswer;
-        }
-        else if (q.type === 'multiple_choice') {
-            if (!Array.isArray(userAnswer)) {
-                isWrong = true;
-            } else {
-                const userSelected = [...userAnswer].sort();
-                const correctAnswers = [...q.correctAnswer].sort();
-                isWrong = !arraysEqual(correctAnswers, userSelected);
-            }
+        } else if (q.type === 'multiple_choice') {
+            isWrong = !Array.isArray(userAnswer) || 
+                !arraysEqual([...userAnswer].sort(), [...q.correctAnswer].sort());
         } else {
             isWrong = userAnswer !== q.correctAnswer;
         }
 
-        if (isWrong) {
-            wrongCount++;
-            const wrongItem = document.createElement('div');
-            wrongItem.classList.add('wrong-item');
-
-            let formattedUserAnswer = '';
-            let formattedCorrectAnswer = q.displayAnswer;
-
-            if (q.type === 'single_choice') {
-                formattedUserAnswer = userAnswer || '未作答';
-            }
-            else if (q.type === 'multiple_choice') {
-                formattedUserAnswer = Array.isArray(userAnswer) 
-                    ? userAnswer.join('、') 
-                    : '未作答';
-            } else {
-                formattedUserAnswer = userAnswer || '未作答';
-            }
-
-            wrongItem.innerHTML = `
-                <div class="wrong-question">
-                    <strong>第${idx + 1}题 (${getQuestionTypeText(q.type)})</strong>
-                    <p>${q.question}</p>
-                </div>
-                <div class="wrong-answer">
-                    <p>你的答案: <span class="user-wrong">${formattedUserAnswer}</span></p>
-                    <p>正确答案: <span class="correct-answer">${formattedCorrectAnswer}</span></p>
-                </div>
-                ${q.explanation ? `<div class="explanation">解析: ${q.explanation}</div>` : ''}
-            `;
-            document.querySelector('.wrong-answers-container').appendChild(wrongItem);
-        }
+        if (!isWrong) return;
+        
+        wrongCount++;
+        const wrongItem = document.createElement('div');
+        wrongItem.className = 'wrong-item';
+        
+        // 格式化用户答案
+        const formattedUserAnswer = formatUserAnswer(userAnswer, q.type);
+        
+        // 构建错题项HTML
+        wrongItem.innerHTML = `
+            <div class="wrong-question">
+                <strong>第${idx + 1}题 (${getQuestionTypeText(q.type)})</strong>
+                <p>${q.question}</p>
+            </div>
+            <div class="wrong-answer">
+                <p>你的答案: <span class="user-wrong">${formattedUserAnswer}</span></p>
+                <p>正确答案: <span class="correct-answer">${q.displayAnswer}</span></p>
+            </div>
+            ${q.explanation ? `<div class="explanation">解析: ${q.explanation}</div>` : ''}
+        `;
+        container.appendChild(wrongItem);
     });
 
     DOM.wrongCount.textContent = wrongCount;
 }
 
-// 辅助函数
-function arraysEqual(a, b) {
-    if (a === b) return true;
-    if (a == null || b == null) return false;
-    if (a.length !== b.length) return false;
-
-    for (let i = 0; i < a.length; ++i) {
-        if (a[i] !== b[i]) return false;
-    }
-    return true;
+// 辅助函数：格式化用户答案
+function formatUserAnswer(answer, type) {
+    if (!answer) return '未作答';
+    return Array.isArray(answer) ? answer.join('、') : answer;
 }
 
+// 辅助函数：比较数组是否相等
+function arraysEqual(a, b) {
+    if (a === b) return true;
+    if (!Array.isArray(a) || !Array.isArray(b)) return false;
+    if (a.length !== b.length) return false;
+    
+    const sortedA = [...a].sort();
+    const sortedB = [...b].sort();
+    return sortedA.every((val, i) => val === sortedB[i]);
+}
+
+// 辅助函数：获取题型文本
 function getQuestionTypeText(type) {
-    const typeMap = {
+    const types = {
         'single_choice': '单选题',
         'multiple_choice': '多选题',
         'true_false': '判断题'
     };
-    return typeMap[type] || '';
+    return types[type] || '';
 }
 
 // 启动应用
