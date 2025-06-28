@@ -6,7 +6,7 @@ const AppState = {
     userAnswers: [],
     score: 0,
     examTimer: null,
-    examTimeLeft: 90 * 60, // 90分钟考试时间
+    examTimeLeft: 1 * 60, // 改为1分钟考试时间
     canSubmit: false,
     isMobile: /Mobi|Android/i.test(navigator.userAgent),
     initialized: false,
@@ -190,11 +190,11 @@ function startExam() {
     DOM.resultScreen.classList.add('hidden');
     DOM.wrongAnswersScreen.classList.add('hidden');
     
-    // 5分钟后允许交卷
+    // 5秒钟后允许交卷
     setTimeout(() => {
         AppState.canSubmit = true;
         updateUIState();
-    }, 5 * 60 * 1000);
+    }, 5 * 1000);
     
     startTimer();
     showCurrentQuestion();
@@ -206,7 +206,7 @@ function resetExamState() {
     AppState.currentQuestionIndex = 0;
     AppState.userAnswers = new Array(150).fill(null);
     AppState.score = 0;
-    AppState.examTimeLeft = 90 * 60;
+    AppState.examTimeLeft = 1 * 60;
     AppState.canSubmit = false;
     updateUIState();
 }
@@ -225,16 +225,14 @@ function generateRandomExam() {
                 text: o
             }));
             const shuffled = shuffleOptions(optionsWithKeys);
-            const correctAnswer = q.answer; // 保留原始答案字母
-            const displayAnswer = optionsWithKeys.find(o => o.letter === correctAnswer).text;
+            const correctAnswer = q.options.find(o => o.startsWith(q.answer)).trim();
 
             return {
                 ...q,
                 type: 'single_choice',
                 shuffledOptions: shuffled.map(o => o.text),
-                correctAnswer: correctAnswer, // 保留原始答案字母
-                displayAnswer: displayAnswer,
-                originalOptions: optionsWithKeys // 保留原始选项信息
+                correctAnswer,
+                displayAnswer: correctAnswer
             };
         });
 
@@ -248,18 +246,16 @@ function generateRandomExam() {
                 text: o
             }));
             const shuffled = shuffleOptions(optionsWithKeys);
-            const correctAnswers = q.answer; // 保留原始答案字母数组
-            const displayAnswers = correctAnswers.map(a => 
-                optionsWithKeys.find(o => o.letter === a).text
+            const correctAnswers = q.answer.map(a => 
+                q.options.find(o => o.startsWith(a)).trim()
             );
 
             return {
                 ...q,
                 type: 'multiple_choice',
                 shuffledOptions: shuffled.map(o => o.text),
-                correctAnswer: correctAnswers, // 保留原始答案字母数组
-                displayAnswer: displayAnswers.join('、'),
-                originalOptions: optionsWithKeys // 保留原始选项信息
+                correctAnswer: correctAnswers,
+                displayAnswer: correctAnswers.join('、')
             };
         });
 
@@ -447,8 +443,8 @@ function startTimer() {
         timerDisplay.textContent = timeString;
         sheetTimerDisplay.textContent = timeString;
         
-        // 最后5分钟闪烁提醒
-        if (AppState.examTimeLeft <= 5 * 60) {
+        // 最后30秒闪烁提醒
+        if (AppState.examTimeLeft <= 30) {
             timerDisplay.style.color = '#e74c3c';
             timerDisplay.classList.add('blink');
             sheetTimerDisplay.style.color = '#e74c3c';
@@ -466,7 +462,7 @@ function startTimer() {
 // 处理交卷
 function handleSubmit() {
     if (!AppState.canSubmit) {
-        alert('考试开始5分钟后才能交卷！');
+        alert('考试开始5秒钟后才能交卷！');
         return;
     }
     showResult();
@@ -500,24 +496,17 @@ function calculateScore() {
         if (!userAnswer) return;
 
         if (q.type === 'single_choice') {
-            // 获取用户选择的选项字母
-            const userSelectedLetter = q.originalOptions.find(o => o.text === userAnswer)?.letter;
-            singleChoiceScore += (userSelectedLetter === q.correctAnswer ? 0.5 : 0);
+            singleChoiceScore += (userAnswer === q.correctAnswer ? 0.5 : 0);
         } 
         else if (q.type === 'multiple_choice') {
             if (!Array.isArray(userAnswer)) return;
             
-            // 获取用户选择的选项字母数组
-            const userSelectedLetters = userAnswer
-                .map(ans => q.originalOptions.find(o => o.text === ans)?.letter)
-                .filter(letter => letter !== undefined)
-                .sort();
-            
+            const userSelected = [...userAnswer].sort();
             const correctAnswers = [...q.correctAnswer].sort();
             
-            if (arraysEqual(correctAnswers, userSelectedLetters)) {
+            if (arraysEqual(correctAnswers, userSelected)) {
                 multiChoiceScore += 1;
-            } else if (userSelectedLetters.some(ans => correctAnswers.includes(ans))) {
+            } else if (userSelected.some(ans => correctAnswers.includes(ans))) {
                 multiChoiceScore += 0.5;
             }
         } 
@@ -542,22 +531,17 @@ function updateScoreDetails() {
         if (!userAnswer) return;
 
         if (q.type === 'single_choice') {
-            const userSelectedLetter = q.originalOptions.find(o => o.text === userAnswer)?.letter;
-            details.single_choice.score += (userSelectedLetter === q.correctAnswer ? 0.5 : 0);
+            details.single_choice.score += (userAnswer === q.correctAnswer ? 0.5 : 0);
         }
         else if (q.type === 'multiple_choice') {
             if (!Array.isArray(userAnswer)) return;
             
-            const userSelectedLetters = userAnswer
-                .map(ans => q.originalOptions.find(o => o.text === ans)?.letter)
-                .filter(letter => letter !== undefined)
-                .sort();
-            
+            const userSelected = [...userAnswer].sort();
             const correctAnswers = [...q.correctAnswer].sort();
             
-            if (arraysEqual(correctAnswers, userSelectedLetters)) {
+            if (arraysEqual(correctAnswers, userSelected))) {
                 details.multiple_choice.score += 1;
-            } else if (userSelectedLetters.some(ans => correctAnswers.includes(ans))) {
+            } else if (userSelected.some(ans => correctAnswers.includes(ans))) {
                 details.multiple_choice.score += 0.5;
             }
         }
@@ -591,24 +575,15 @@ function showWrongAnswers() {
 
         // 判断是否答错
         if (q.type === 'single_choice') {
-            const userSelectedLetter = q.originalOptions.find(o => o.text === userAnswer)?.letter;
-            isWrong = userSelectedLetter !== q.correctAnswer;
+            isWrong = userAnswer !== q.correctAnswer;
         } else if (q.type === 'multiple_choice') {
-            if (!Array.isArray(userAnswer)) {
-                isWrong = true;
-            } else {
-                const userSelectedLetters = userAnswer
-                    .map(ans => q.originalOptions.find(o => o.text === ans)?.letter)
-                    .filter(letter => letter !== undefined)
-                    .sort();
-                const correctAnswers = [...q.correctAnswer].sort();
-                isWrong = !arraysEqual(userSelectedLetters, correctAnswers);
-            }
+            isWrong = !Array.isArray(userAnswer) || 
+                !arraysEqual([...userAnswer].sort(), [...q.correctAnswer].sort());
         } else {
             isWrong = userAnswer !== q.correctAnswer;
         }
 
-        if (!isWrong || !userAnswer) return;
+        if (!isWrong) return;
         
         wrongCount++;
         const wrongItem = document.createElement('div');
