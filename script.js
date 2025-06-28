@@ -73,6 +73,23 @@ function validateExamData(data) {
     const requiredTypes = ['single_choice', 'multiple_choice', 'true_false'];
     const minCounts = { single_choice: 100, multiple_choice: 20, true_false: 30 };
     
+    // 检查选项格式
+    if (data.single_choice) {
+        data.single_choice.forEach(question => {
+            if (!question.options || question.options.length === 0) {
+                throw new Error(`单选题缺少选项: ${question.question}`);
+            }
+        });
+    }
+    
+    if (data.multiple_choice) {
+        data.multiple_choice.forEach(question => {
+            if (!question.options || question.options.length === 0) {
+                throw new Error(`多选题缺少选项: ${question.question}`);
+            }
+        });
+    }
+    
     return requiredTypes.every(type => {
         if (!data[type] || !Array.isArray(data[type])) {
             throw new Error(`无效的题型格式: ${type}`);
@@ -225,16 +242,19 @@ function generateRandomExam() {
                 text: o
             }));
             const shuffled = shuffleOptions(optionsWithKeys);
-            const correctAnswerIndex = q.options.findIndex(o => o.startsWith(q.answer + "、"));
-            const correctAnswerText = q.options[correctAnswerIndex];
-            const correctShuffledIndex = shuffled.findIndex(o => o.text === correctAnswerText);
+            
+            // 找到原始正确答案对应的选项文本
+            const correctAnswerText = q.answer;
+            const correctShuffledIndex = shuffled.findIndex(o => 
+                o.text.endsWith(correctAnswerText) || o.text.includes(correctAnswerText)
+            );
             
             return {
                 ...q,
                 type: 'single_choice',
                 shuffledOptions: shuffled.map(o => o.text),
-                correctAnswer: correctAnswerText,
-                displayAnswer: correctAnswerText,
+                correctAnswer: shuffled[correctShuffledIndex]?.text || q.answer,
+                displayAnswer: shuffled[correctShuffledIndex]?.text || q.answer,
                 correctIndex: correctShuffledIndex
             };
         });
@@ -252,8 +272,10 @@ function generateRandomExam() {
             
             // 找到原始正确答案对应的选项文本
             const correctAnswers = q.answer.map(a => {
-                const originalIndex = q.options.findIndex(o => o.startsWith(a + "、"));
-                return q.options[originalIndex];
+                const matchOption = shuffled.find(o => 
+                    o.text.endsWith(a) || o.text.includes(a)
+                );
+                return matchOption ? matchOption.text : a;
             });
             
             // 找到打乱后正确答案的索引
@@ -278,8 +300,8 @@ function generateRandomExam() {
         .map(q => ({
             ...q,
             type: 'true_false',
-            shuffledOptions: ['正确', '错误'],
-            correctAnswer: q.answer ? '正确' : '错误',
+            shuffledOptions: ['A、正确', 'B、错误'],
+            correctAnswer: q.answer ? 'A、正确' : 'B、错误',
             displayAnswer: q.answer ? '正确' : '错误'
         }));
 
@@ -287,19 +309,27 @@ function generateRandomExam() {
     AppState.userAnswers = new Array(AppState.currentExam.length).fill(null);
 }
 
-// 打乱选项顺序（包含重新编号逻辑）
+// 打乱选项顺序（改进版：处理选项重新编号）
 function shuffleOptions(options) {
-    // 1. 打乱选项内容
-    const shuffled = [...options].sort(() => Math.random() - 0.5);
+    // 1. 清理原始编号（兼容各种格式）
+    const cleanedOptions = options.map(option => {
+        // 尝试提取内容部分（去除可能存在的编号和分隔符）
+        const contentMatch = option.text.match(/^[A-Za-z0-9一二三四五六七八九十]+[、.\s]?(.+)$/);
+        return {
+            ...option,
+            text: contentMatch ? contentMatch[1] : option.text
+        };
+    });
+
+    // 2. 打乱顺序
+    const shuffled = [...cleanedOptions].sort(() => Math.random() - 0.5);
     
-    // 2. 重新分配编号（A/B/C/D...）
+    // 3. 重新分配字母编号（A、B、C...）
     return shuffled.map((option, index) => {
         const letter = String.fromCharCode(65 + index); // A=65, B=66...
-        // 保留原始内容，仅替换编号（假设原始格式为"编号、内容"）
-        const originalContent = option.text.split("、", 2)[1] || option.text;
         return {
-            text: `${letter}、${originalContent}`,
-            originalIndex: option.originalIndex
+            ...option,
+            text: `${letter}、${option.text}` // 添加新编号
         };
     });
 }
