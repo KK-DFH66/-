@@ -225,14 +225,16 @@ function generateRandomExam() {
                 text: o
             }));
             const shuffled = shuffleOptions(optionsWithKeys);
-            const correctAnswer = shuffled.find(o => o.letter === q.answer).text;
+            const correctAnswer = q.answer; // 保留原始答案字母
+            const displayAnswer = optionsWithKeys.find(o => o.letter === correctAnswer).text;
 
             return {
                 ...q,
                 type: 'single_choice',
                 shuffledOptions: shuffled.map(o => o.text),
-                correctAnswer,
-                displayAnswer: correctAnswer
+                correctAnswer: correctAnswer, // 保留原始答案字母
+                displayAnswer: displayAnswer,
+                originalOptions: optionsWithKeys // 保留原始选项信息
             };
         });
 
@@ -246,16 +248,18 @@ function generateRandomExam() {
                 text: o
             }));
             const shuffled = shuffleOptions(optionsWithKeys);
-            const correctAnswers = q.answer.map(a => 
-                shuffled.find(o => o.letter === a).text
+            const correctAnswers = q.answer; // 保留原始答案字母数组
+            const displayAnswers = correctAnswers.map(a => 
+                optionsWithKeys.find(o => o.letter === a).text
             );
 
             return {
                 ...q,
                 type: 'multiple_choice',
                 shuffledOptions: shuffled.map(o => o.text),
-                correctAnswer: correctAnswers,
-                displayAnswer: correctAnswers.join('、')
+                correctAnswer: correctAnswers, // 保留原始答案字母数组
+                displayAnswer: displayAnswers.join('、'),
+                originalOptions: optionsWithKeys // 保留原始选项信息
             };
         });
 
@@ -496,17 +500,24 @@ function calculateScore() {
         if (!userAnswer) return;
 
         if (q.type === 'single_choice') {
-            singleChoiceScore += (userAnswer === q.correctAnswer ? 0.5 : 0);
+            // 获取用户选择的选项字母
+            const userSelectedLetter = q.originalOptions.find(o => o.text === userAnswer)?.letter;
+            singleChoiceScore += (userSelectedLetter === q.correctAnswer ? 0.5 : 0);
         } 
         else if (q.type === 'multiple_choice') {
             if (!Array.isArray(userAnswer)) return;
             
-            const userSelected = [...userAnswer].sort();
+            // 获取用户选择的选项字母数组
+            const userSelectedLetters = userAnswer
+                .map(ans => q.originalOptions.find(o => o.text === ans)?.letter)
+                .filter(letter => letter !== undefined)
+                .sort();
+            
             const correctAnswers = [...q.correctAnswer].sort();
             
-            if (arraysEqual(correctAnswers, userSelected)) {
+            if (arraysEqual(correctAnswers, userSelectedLetters)) {
                 multiChoiceScore += 1;
-            } else if (userSelected.some(ans => correctAnswers.includes(ans))) {
+            } else if (userSelectedLetters.some(ans => correctAnswers.includes(ans))) {
                 multiChoiceScore += 0.5;
             }
         } 
@@ -531,17 +542,22 @@ function updateScoreDetails() {
         if (!userAnswer) return;
 
         if (q.type === 'single_choice') {
-            details.single_choice.score += (userAnswer === q.correctAnswer ? 0.5 : 0);
+            const userSelectedLetter = q.originalOptions.find(o => o.text === userAnswer)?.letter;
+            details.single_choice.score += (userSelectedLetter === q.correctAnswer ? 0.5 : 0);
         }
         else if (q.type === 'multiple_choice') {
             if (!Array.isArray(userAnswer)) return;
             
-            const userSelected = [...userAnswer].sort();
+            const userSelectedLetters = userAnswer
+                .map(ans => q.originalOptions.find(o => o.text === ans)?.letter)
+                .filter(letter => letter !== undefined)
+                .sort();
+            
             const correctAnswers = [...q.correctAnswer].sort();
             
-            if (arraysEqual(correctAnswers, userSelected)) {
+            if (arraysEqual(correctAnswers, userSelectedLetters)) {
                 details.multiple_choice.score += 1;
-            } else if (userSelected.some(ans => correctAnswers.includes(ans))) {
+            } else if (userSelectedLetters.some(ans => correctAnswers.includes(ans))) {
                 details.multiple_choice.score += 0.5;
             }
         }
@@ -575,15 +591,24 @@ function showWrongAnswers() {
 
         // 判断是否答错
         if (q.type === 'single_choice') {
-            isWrong = userAnswer !== q.correctAnswer;
+            const userSelectedLetter = q.originalOptions.find(o => o.text === userAnswer)?.letter;
+            isWrong = userSelectedLetter !== q.correctAnswer;
         } else if (q.type === 'multiple_choice') {
-            isWrong = !Array.isArray(userAnswer) || 
-                !arraysEqual([...userAnswer].sort(), [...q.correctAnswer].sort());
+            if (!Array.isArray(userAnswer)) {
+                isWrong = true;
+            } else {
+                const userSelectedLetters = userAnswer
+                    .map(ans => q.originalOptions.find(o => o.text === ans)?.letter)
+                    .filter(letter => letter !== undefined)
+                    .sort();
+                const correctAnswers = [...q.correctAnswer].sort();
+                isWrong = !arraysEqual(userSelectedLetters, correctAnswers);
+            }
         } else {
             isWrong = userAnswer !== q.correctAnswer;
         }
 
-        if (!isWrong) return;
+        if (!isWrong || !userAnswer) return;
         
         wrongCount++;
         const wrongItem = document.createElement('div');
