@@ -15,19 +15,17 @@
                 <h3>考试说明</h3>
                 <ul>
                     <li><strong>考试时间：</strong>90分钟</li>
-                    <li><strong>题目数量：</strong>150题
-                        <ul>
-                            <li>单选题：100题 × 0.5分</li>
-                            <li>多选题：20题 × 1分</li>
-                            <li>判断题：30题 × 1分</li>
-                        </ul>
+                    <li><strong>题目顺序：</strong>
+                        <ol>
+                            <li>单选题（100题 × 0.5分）</li>
+                            <li>多选题（20题 × 1分）</li>
+                            <li>判断题（30题 × 1分）</li>
+                        </ol>
                     </li>
-                    <li><strong>总分：</strong>100分</li>
-                    <li><strong>合格标准：</strong>≥60分</li>
-                    <li><strong>交卷规则：</strong>开始15分钟后才能交卷</li>
+                    <li><strong>总分：</strong>100分（合格线60分）</li>
                 </ul>
                 <div class="notice">
-                    <p>注意：多选题完全正确得1分，部分正确得0.5分</p>
+                    <p>注意：每个题型内的题目顺序随机，但题型顺序固定</p>
                 </div>
             </div>
             <button id="start-btn" class="primary-btn">开始考试</button>
@@ -39,6 +37,7 @@
                 <div class="progress"></div>
                 <span class="progress-text">0/150</span>
             </div>
+            <div id="section-title" class="section-title"></div>
             <div class="question-container">
                 <div class="question-meta">
                     <span class="question-type"></span>
