@@ -194,7 +194,7 @@ function startExam() {
     setTimeout(() => {
         AppState.canSubmit = true;
         updateUIState();
-    }, 2 * 60 * 1000);
+    }, 5 * 60 * 1000);
     
     startTimer();
     showCurrentQuestion();
@@ -211,28 +211,36 @@ function resetExamState() {
     updateUIState();
 }
 
-// 生成随机试卷（修正后的版本）
+// 生成随机试卷（最终修正版）
 function generateRandomExam() {
     AppState.currentExam = [];
     
-    // 处理单选题（修正部分）
+    // 处理单选题（字母固定+内容随机）
     const singleChoices = [...AppState.examData.single_choice]
         .sort(() => Math.random() - 0.5)
         .slice(0, 100)
         .map(q => {
-            // 创建选项副本并随机排序
-            const optionsCopy = [...q.options];
-            const shuffledOptions = optionsCopy.sort(() => Math.random() - 0.5);
+            // 提取选项内容（去掉字母）
+            const optionContents = q.options.map(o => o.split("、")[1]);
             
-            // 查找新位置中的正确答案
-            const correctAnswer = shuffledOptions.find(option => 
-                option.startsWith(q.answer + "、"));
+            // 打乱内容顺序
+            const shuffledContents = [...optionContents].sort(() => Math.random() - 0.5);
             
+            // 固定字母标签顺序（A/B/C/D）
+            const shuffledOptions = ['A', 'B', 'C', 'D'].slice(0, q.options.length)
+                .map((letter, index) => `${letter}、${shuffledContents[index]}`);
+            
+            // 动态绑定正确答案
+            const originalCorrectText = q.options.find(opt => 
+                opt.startsWith(q.answer)).split("、")[1];
+            const correctAnswer = shuffledOptions.find(opt => 
+                opt.endsWith(originalCorrectText));
+
             return {
                 ...q,
                 type: 'single_choice',
-                shuffledOptions,  // 随机排序但完整的选项
-                correctAnswer,    // 新位置的正确答案
+                shuffledOptions,  // 字母固定但内容随机
+                correctAnswer,    // 动态绑定到新位置
                 displayAnswer: correctAnswer
             };
         });
@@ -445,7 +453,7 @@ function startTimer() {
 // 处理交卷
 function handleSubmit() {
     if (!AppState.canSubmit) {
-        alert('考试开始2分钟后才能交卷！');
+        alert('考试开始5分钟后才能交卷！');
         return;
     }
     showResult();
