@@ -1,41 +1,72 @@
 // 全局状态管理
 const AppState = {
-    initialized: false,
     examData: null,
     currentExam: [],
     currentQuestionIndex: 0,
     userAnswers: [],
     score: 0,
-    examTimeLeft: 90 * 60,
+    examTimer: null,
+    examTimeLeft: 90 * 60, // 90分钟考试时间
     canSubmit: false,
-    examTimer: null
+    isMobile: /Mobi|Android/i.test(navigator.userAgent),
+    initialized: false,
+    loading: false,
+    error: null,
+    touchStartX: 0
 };
 
-// DOM 元素引用
+// DOM元素缓存
 const DOM = {
     startScreen: document.getElementById('start-screen'),
     examScreen: document.getElementById('exam-screen'),
     answerSheetScreen: document.getElementById('answer-sheet-screen'),
     resultScreen: document.getElementById('result-screen'),
     wrongAnswersScreen: document.getElementById('wrong-answers-screen'),
-    singleChoiceSheet: document.getElementById('single-choice-sheet'),
-    multiChoiceSheet: document.getElementById('multi-choice-sheet'),
-    judgmentSheet: document.getElementById('judgment-sheet'),
-    progressText: document.querySelector('.progress-text'),
-    sectionTitle: document.getElementById('section-title'),
-    questionText: document.querySelector('.question-text'),
-    optionsContainer: document.querySelector('.options-container'),
-    answerSheetBtn: document.getElementById('answer-sheet-btn'),
+    startBtn: document.getElementById('start-btn'),
     submitBtn: document.getElementById('submit-btn'),
-    backToExamBtn: document.getElementById('back-to-exam-btn'),
     viewWrongBtn: document.getElementById('view-wrong-btn'),
     newExamBtn: document.getElementById('new-exam-btn'),
     backToResultBtn: document.getElementById('back-to-result-btn'),
-    totalScore: document.querySelector('.total-score'),
-    passBadge: document.querySelector('.pass-badge'),
-    scoreDetails: document.querySelector('.score-details'),
+    answerSheetBtn: document.getElementById('answer-sheet-btn'),
+    backToExamBtn: document.getElementById('back-to-exam-btn'),
+    sectionTitle: document.getElementById('section-title'),
+    questionType: document.querySelector('.question-type'),
+    questionText: document.querySelector('.question-text'),
+    optionsContainer: document.querySelector('.options-container'),
+    progressBar: document.querySelector('.progress'),
+    progressText: document.querySelector('.progress-text'),
+    singleChoiceSheet: document.getElementById('single-choice-sheet'),
+    multiChoiceSheet: document.getElementById('multi-choice-sheet'),
+    judgmentSheet: document.getElementById('judgment-sheet'),
+    answeredCount: document.getElementById('answered-count'),
+    errorMessage: document.getElementById('error-message'),
     wrongCount: document.getElementById('wrong-count')
 };
+
+// 初始化应用
+async function initApp() {
+    if (AppState.initialized || AppState.loading) return;
+    
+    AppState.loading = true;
+    updateUIState();
+    
+    try {
+        const response = await fetch('exam.json');
+        if (!response.ok) throw new Error(`题库加载失败 (HTTP ${response.status})`);
+        const data = await response.json();
+        
+        if (!validateExamData(data)) throw new Error('题库格式验证失败');
+        AppState.examData = data;
+        AppState.initialized = true;
+        bindEventListeners();
+    } catch (error) {
+        AppState.error = error;
+        showError(error.message);
+    } finally {
+        AppState.loading = false;
+        updateUIState();
+    }
+}
 
 // 题库验证
 function validateExamData(data) {
@@ -50,25 +81,134 @@ function validateExamData(data) {
     });
 }
 
-// 打乱数组顺序
-function shuffleArray(array) {
-    for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
+// 更新UI状态
+function updateUIState() {
+    if (AppState.loading) {
+        DOM.startBtn.disabled = true;
+        DOM.startBtn.classList.add('loading');
+        DOM.startBtn.innerHTML = '<span class="loading-spinner"></span> 加载中...';
+    } else if (AppState.error) {
+        DOM.startBtn.disabled = false;
+        DOM.startBtn.classList.remove('loading');
+        DOM.startBtn.textContent = '重试';
+    } else if (AppState.initialized) {
+        DOM.startBtn.disabled = false;
+        DOM.startBtn.classList.remove('loading');
+        DOM.startBtn.textContent = '开始考试';
     }
-    return array;
+    
+    if (AppState.error) {
+        DOM.errorMessage.textContent = `错误: ${AppState.error.message}`;
+        DOM.errorMessage.classList.remove('hidden');
+    } else {
+        DOM.errorMessage.classList.add('hidden');
+    }
+    
+    DOM.submitBtn.disabled = !AppState.canSubmit;
 }
 
-// 打乱选项顺序并重新编号
-function shuffleOptions(options) {
-    const shuffled = shuffleArray(options);
-    return shuffled.map((o, index) => {
-        const letter = String.fromCharCode(65 + index);
-        return {
-            letter,
-            text: `${letter}、${o.text.split('、')[1]}`
-        };
+// 显示错误
+function showError(message) {
+    console.error('系统错误:', message);
+    DOM.errorMessage.textContent = `错误: ${message}`;
+    DOM.errorMessage.classList.remove('hidden');
+}
+
+// 绑定事件监听器
+function bindEventListeners() {
+    DOM.startBtn.addEventListener('click', startExam);
+    DOM.submitBtn.addEventListener('click', handleSubmit);
+    DOM.answerSheetBtn.addEventListener('click', showAnswerSheet);
+    DOM.backToExamBtn.addEventListener('click', () => {
+        DOM.answerSheetScreen.classList.add('hidden');
+        DOM.examScreen.classList.remove('hidden');
     });
+    DOM.viewWrongBtn.addEventListener('click', showWrongAnswers);
+    DOM.backToResultBtn.addEventListener('click', () => {
+        DOM.wrongAnswersScreen.classList.add('hidden');
+        DOM.resultScreen.classList.remove('hidden');
+    });
+    DOM.newExamBtn.addEventListener('click', startExam);
+    
+    // 按钮点击效果
+    DOM.startBtn.addEventListener('mousedown', () => {
+        DOM.startBtn.style.transform = 'scale(0.98)';
+    });
+    DOM.startBtn.addEventListener('mouseup', () => {
+        DOM.startBtn.style.transform = '';
+    });
+    DOM.startBtn.addEventListener('mouseleave', () => {
+        DOM.startBtn.style.transform = '';
+    });
+    
+    // 移动端手势支持
+    if (AppState.isMobile) {
+        DOM.examScreen.addEventListener('touchstart', handleTouchStart, false);
+        DOM.examScreen.addEventListener('touchend', handleTouchEnd, false);
+    } else {
+        DOM.examScreen.addEventListener('wheel', handleWheel, { passive: false });
+    }
+}
+
+// 触摸事件处理
+function handleTouchStart(e) {
+    AppState.touchStartX = e.changedTouches[0].screenX;
+}
+
+function handleTouchEnd(e) {
+    const touchEndX = e.changedTouches[0].screenX;
+    const diffX = touchEndX - AppState.touchStartX;
+    
+    if (Math.abs(diffX) > 50) {
+        diffX > 0 ? showPreviousQuestion() : showNextQuestion();
+    }
+}
+
+// 滚轮事件处理
+function handleWheel(e) {
+    e.preventDefault();
+    if (e.deltaY > 0) {
+        showNextQuestion();
+    } else if (e.deltaY < 0) {
+        showPreviousQuestion();
+    }
+}
+
+// 开始考试
+function startExam() {
+    if (!AppState.initialized) return;
+    
+    resetExamState();
+    generateRandomExam();
+    
+    clearInterval(AppState.examTimer);
+    document.getElementById('timer-display')?.remove();
+    
+    DOM.startScreen.classList.add('hidden');
+    DOM.examScreen.classList.remove('hidden');
+    DOM.answerSheetScreen.classList.add('hidden');
+    DOM.resultScreen.classList.add('hidden');
+    DOM.wrongAnswersScreen.classList.add('hidden');
+    
+    // 5分钟后允许交卷
+    setTimeout(() => {
+        AppState.canSubmit = true;
+        updateUIState();
+    }, 5 * 60 * 1000);
+    
+    startTimer();
+    showCurrentQuestion();
+    updateAnswerSheet();
+}
+
+// 重置考试状态
+function resetExamState() {
+    AppState.currentQuestionIndex = 0;
+    AppState.userAnswers = new Array(150).fill(null);
+    AppState.score = 0;
+    AppState.examTimeLeft = 90 * 60;
+    AppState.canSubmit = false;
+    updateUIState();
 }
 
 // 生成随机试卷（核心函数）
@@ -115,7 +255,8 @@ function generateRandomExam() {
                 type: 'multiple_choice',
                 shuffledOptions: shuffled.map(o => o.text),
                 correctAnswer: correctAnswers,
-                displayAnswer: correctAnswers.join('、')
+                displayAnswer: correctAnswers.join('、'),
+                correctLetters: q.answer // 保存原始正确字母
             };
         });
 
@@ -135,104 +276,95 @@ function generateRandomExam() {
     AppState.userAnswers = new Array(AppState.currentExam.length).fill(null);
 }
 
-// 重置考试状态
-function resetExamState() {
-    AppState.currentQuestionIndex = 0;
-    AppState.userAnswers = new Array(150).fill(null);
-    AppState.score = 0;
-    AppState.examTimeLeft = 90 * 60;
-    AppState.canSubmit = false;
-    updateUIState();
-}
-
-// 开始考试
-function startExam() {
-    if (!AppState.initialized) return;
-    
-    resetExamState();
-    generateRandomExam();
-    
-    clearInterval(AppState.examTimer);
-    document.getElementById('timer-display')?.remove();
-    
-    DOM.startScreen.classList.add('hidden');
-    DOM.examScreen.classList.remove('hidden');
-    DOM.answerSheetScreen.classList.add('hidden');
-    DOM.resultScreen.classList.add('hidden');
-    DOM.wrongAnswersScreen.classList.add('hidden');
-    
-    // 2分钟后允许交卷
-    setTimeout(() => {
-        AppState.canSubmit = true;
-        updateUIState();
-    }, 2 * 60 * 1000);
-    
-    startTimer();
-    showCurrentQuestion();
-    updateAnswerSheet();
+// 打乱选项顺序
+function shuffleOptions(options) {
+    const arr = [...options];
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
 }
 
 // 显示当前题目
 function showCurrentQuestion() {
     const question = AppState.currentExam[AppState.currentQuestionIndex];
-    DOM.questionText.textContent = question.question;
+    const totalQuestions = AppState.currentExam.length;
+    
+    // 更新进度条
+    DOM.progressBar.style.width = `${(AppState.currentQuestionIndex + 1) / totalQuestions * 100}%`;
+    DOM.progressText.textContent = `${AppState.currentQuestionIndex + 1}/${totalQuestions}`;
+    
+    // 更新板块标题
+    let sectionTitle = '';
+    if (AppState.currentQuestionIndex < 100) {
+        sectionTitle = '单选题板块 (1-100)';
+    } else if (AppState.currentQuestionIndex < 120) {
+        sectionTitle = '多选题板块 (101-120)';
+    } else {
+        sectionTitle = '判断题板块 (121-150)';
+    }
+    DOM.sectionTitle.textContent = sectionTitle;
+    
+    // 显示题目信息
+    DOM.questionType.textContent = question.type === 'single_choice' ? '单选题' : 
+                                 question.type === 'multiple_choice' ? '多选题' : '判断题';
+    DOM.questionText.textContent = `${AppState.currentQuestionIndex + 1}. ${question.question}`;
+    
+    // 清空并重建选项
     DOM.optionsContainer.innerHTML = '';
-
     question.shuffledOptions.forEach(option => {
-        const optionDiv = document.createElement('div');
-        optionDiv.className = 'option';
-        optionDiv.textContent = option;
-
-        if (question.type === 'single_choice') {
-            optionDiv.addEventListener('click', () => {
-                AppState.userAnswers[AppState.currentQuestionIndex] = option;
-                updateAnswerSheet();
-                showNextQuestion();
-            });
-        } else if (question.type === 'multiple_choice') {
-            optionDiv.addEventListener('click', () => {
-                if (!AppState.userAnswers[AppState.currentQuestionIndex]) {
-                    AppState.userAnswers[AppState.currentQuestionIndex] = [];
-                }
-                const index = AppState.userAnswers[AppState.currentQuestionIndex].indexOf(option);
-                if (index === -1) {
-                    AppState.userAnswers[AppState.currentQuestionIndex].push(option);
-                    optionDiv.classList.add('selected');
-                } else {
-                    AppState.userAnswers[AppState.currentQuestionIndex].splice(index, 1);
-                    optionDiv.classList.remove('selected');
-                }
-                updateAnswerSheet();
-            });
-        } else if (question.type === 'true_false') {
-            optionDiv.addEventListener('click', () => {
-                AppState.userAnswers[AppState.currentQuestionIndex] = option;
-                updateAnswerSheet();
-                showNextQuestion();
-            });
+        const optionElement = document.createElement('div');
+        optionElement.classList.add('option');
+        optionElement.textContent = option;
+        
+        // 设置选中状态
+        if (question.type === 'multiple_choice') {
+            if (Array.isArray(AppState.userAnswers[AppState.currentQuestionIndex])) {
+                optionElement.classList.toggle('selected', 
+                    AppState.userAnswers[AppState.currentQuestionIndex].includes(option));
+            }
+        } else {
+            optionElement.classList.toggle('selected', 
+                AppState.userAnswers[AppState.currentQuestionIndex] === option);
         }
-
-        if (Array.isArray(AppState.userAnswers[AppState.currentQuestionIndex]) &&
-            AppState.userAnswers[AppState.currentQuestionIndex].includes(option)) {
-            optionDiv.classList.add('selected');
-        }
-
-        DOM.optionsContainer.appendChild(optionDiv);
+        
+        // 添加点击事件
+        optionElement.addEventListener('click', () => selectOption(option));
+        DOM.optionsContainer.appendChild(optionElement);
     });
-
-    DOM.progressText.textContent = `${AppState.currentQuestionIndex + 1}/150`;
-    updateSectionTitle();
+    
+    updateAnswerSheet();
 }
 
-// 更新题目类型标题
-function updateSectionTitle() {
-    const index = AppState.currentQuestionIndex;
-    if (index < 100) {
-        DOM.sectionTitle.textContent = '单选题';
-    } else if (index < 120) {
-        DOM.sectionTitle.textContent = '多选题';
+// 选择答案
+function selectOption(selectedOption) {
+    const currentQuestion = AppState.currentExam[AppState.currentQuestionIndex];
+    
+    if (currentQuestion.type === 'multiple_choice') {
+        if (!Array.isArray(AppState.userAnswers[AppState.currentQuestionIndex])) {
+            AppState.userAnswers[AppState.currentQuestionIndex] = [];
+        }
+        
+        const index = AppState.userAnswers[AppState.currentQuestionIndex].indexOf(selectedOption);
+        if (index === -1) {
+            AppState.userAnswers[AppState.currentQuestionIndex].push(selectedOption);
+        } else {
+            AppState.userAnswers[AppState.currentQuestionIndex].splice(index, 1);
+        }
     } else {
-        DOM.sectionTitle.textContent = '判断题';
+        AppState.userAnswers[AppState.currentQuestionIndex] = selectedOption;
+    }
+    
+    showCurrentQuestion();
+    updateAnswerSheet();
+}
+
+// 显示上一题
+function showPreviousQuestion() {
+    if (AppState.currentQuestionIndex > 0) {
+        AppState.currentQuestionIndex--;
+        showCurrentQuestion();
     }
 }
 
@@ -241,8 +373,18 @@ function showNextQuestion() {
     if (AppState.currentQuestionIndex < AppState.currentExam.length - 1) {
         AppState.currentQuestionIndex++;
         showCurrentQuestion();
-        updateAnswerSheet();
     }
+}
+
+// 显示答题卡
+function showAnswerSheet() {
+    DOM.examScreen.classList.add('hidden');
+    DOM.answerSheetScreen.classList.remove('hidden');
+    
+    const answeredCount = AppState.userAnswers.filter(answer => 
+        answer !== null && (Array.isArray(answer) ? answer.length > 0 : true)
+    ).length;
+    DOM.answeredCount.textContent = answeredCount;
 }
 
 // 更新答题卡
@@ -281,18 +423,67 @@ function updateAnswerSheet() {
             DOM.judgmentSheet.appendChild(sheetNumber);
         }
     });
+}
 
-    const answeredCount = AppState.userAnswers.filter(ans => ans !== null).length;
-    document.getElementById('answered-count').textContent = answeredCount;
+// 启动计时器
+function startTimer() {
+    const timerDisplay = document.createElement('div');
+    timerDisplay.id = 'timer-display';
+    DOM.examScreen.insertBefore(timerDisplay, DOM.examScreen.firstChild);
+
+    const sheetTimerDisplay = document.createElement('div');
+    sheetTimerDisplay.id = 'sheet-timer-display';
+    DOM.answerSheetScreen.insertBefore(sheetTimerDisplay, DOM.answerSheetScreen.firstChild);
+
+    AppState.examTimer = setInterval(() => {
+        AppState.examTimeLeft--;
+        const minutes = Math.floor(AppState.examTimeLeft / 60);
+        const seconds = AppState.examTimeLeft % 60;
+        const timeString = `剩余时间: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+        
+        timerDisplay.textContent = timeString;
+        sheetTimerDisplay.textContent = timeString;
+        
+        // 最后5分钟闪烁提醒
+        if (AppState.examTimeLeft <= 5 * 60) {
+            timerDisplay.style.color = '#e74c3c';
+            timerDisplay.classList.add('blink');
+            sheetTimerDisplay.style.color = '#e74c3c';
+            sheetTimerDisplay.classList.add('blink');
+        }
+        
+        // 考试时间结束
+        if (AppState.examTimeLeft <= 0) {
+            clearInterval(AppState.examTimer);
+            showResult();
+        }
+    }, 1000);
 }
 
 // 处理交卷
 function handleSubmit() {
     if (!AppState.canSubmit) {
-        alert('考试开始2分钟后才能交卷！');
+        alert('考试开始5分钟后才能交卷！');
         return;
     }
     showResult();
+}
+
+// 显示考试结果
+function showResult() {
+    clearInterval(AppState.examTimer);
+    calculateScore();
+    
+    DOM.examScreen.classList.add('hidden');
+    DOM.answerSheetScreen.classList.add('hidden');
+    DOM.resultScreen.classList.remove('hidden');
+    
+    const isPassed = AppState.score >= 60;
+    document.querySelector('.total-score').textContent = AppState.score.toFixed(1);
+    document.querySelector('.pass-badge').className = isPassed ? 'pass-badge' : 'pass-badge fail-badge';
+    document.querySelector('.pass-badge').textContent = isPassed ? '合格' : '不合格';
+    
+    updateScoreDetails();
 }
 
 // 计算分数
@@ -311,11 +502,23 @@ function calculateScore() {
         else if (q.type === 'multiple_choice') {
             if (!Array.isArray(userAnswer)) return;
             
-            const userSelected = [...userAnswer].sort();
-            const correctAnswers = [...q.correctAnswer].sort();
+            // 获取用户选择的字母
+            const userSelectedLetters = userAnswer.map(ans => {
+                return ans.split("、")[0]; // 提取选项字母
+            });
             
-            if (arraysEqual(correctAnswers, userSelected)) {
-                multiChoiceScore += 1.5;
+            // 比较用户选择的字母和正确答案字母
+            const correctLetters = q.correctLetters;
+            const correctCount = correctLetters.filter(letter => 
+                userSelectedLetters.includes(letter)).length;
+            
+            if (correctCount === correctLetters.length && 
+                userSelectedLetters.length === correctLetters.length) {
+                // 完全正确
+                multiChoiceScore += 1;
+            } else if (correctCount > 0) {
+                // 部分正确
+                multiChoiceScore += 0.5;
             }
         } 
         else if (q.type === 'true_false') {
@@ -326,20 +529,11 @@ function calculateScore() {
     AppState.score = singleChoiceScore + multiChoiceScore + judgmentScore;
 }
 
-// 判断两个数组是否相等
-function arraysEqual(a, b) {
-    if (a.length !== b.length) return false;
-    for (let i = 0; i < a.length; i++) {
-        if (a[i] !== b[i]) return false;
-    }
-    return true;
-}
-
 // 更新分数详情
 function updateScoreDetails() {
     const details = {
         'single_choice': { score: 0, max: 50 },
-        'multiple_choice': { score: 0, max: 30 },
+        'multiple_choice': { score: 0, max: 20 },
         'true_false': { score: 0, max: 30 }
     };
 
@@ -353,11 +547,16 @@ function updateScoreDetails() {
         else if (q.type === 'multiple_choice') {
             if (!Array.isArray(userAnswer)) return;
             
-            const userSelected = [...userAnswer].sort();
-            const correctAnswers = [...q.correctAnswer].sort();
+            const userSelectedLetters = userAnswer.map(ans => ans.split("、")[0]);
+            const correctLetters = q.correctLetters;
+            const correctCount = correctLetters.filter(letter => 
+                userSelectedLetters.includes(letter)).length;
             
-            if (arraysEqual(correctAnswers, userSelected)) {
-                details.multiple_choice.score += 1.5;
+            if (correctCount === correctLetters.length && 
+                userSelectedLetters.length === correctLetters.length) {
+                details.multiple_choice.score += 1;
+            } else if (correctCount > 0) {
+                details.multiple_choice.score += 0.5;
             }
         }
         else if (q.type === 'true_false') {
@@ -373,25 +572,6 @@ function updateScoreDetails() {
         document.querySelector(`.${typeKey} .detail-score`).textContent = 
             `${details[type].score.toFixed(1)}/${details[type].max}`;
     });
-}
-
-// 显示结果
-function showResult() {
-    clearInterval(AppState.examTimer);
-    document.getElementById('timer-display')?.remove();
-
-    calculateScore();
-    updateScoreDetails();
-
-    DOM.examScreen.classList.add('hidden');
-    DOM.answerSheetScreen.classList.add('hidden');
-    DOM.resultScreen.classList.remove('hidden');
-    DOM.wrongAnswersScreen.classList.add('hidden');
-
-    DOM.totalScore.textContent = AppState.score;
-    const passBadge = DOM.passBadge;
-    passBadge.textContent = AppState.score >= 60 ? '合格' : '不合格';
-    passBadge.className = AppState.score >= 60 ? 'pass-badge' : 'fail-badge';
 }
 
 // 显示错题解析
@@ -411,20 +591,28 @@ function showWrongAnswers() {
         if (q.type === 'single_choice') {
             isWrong = userAnswer !== q.correctAnswer;
         } else if (q.type === 'multiple_choice') {
-            isWrong = !Array.isArray(userAnswer) || 
-                !arraysEqual([...userAnswer].sort(), [...q.correctAnswer].sort());
+            if (!Array.isArray(userAnswer)) {
+                isWrong = true;
+            } else {
+                const userSelectedLetters = userAnswer.map(ans => ans.split("、")[0]);
+                const correctLetters = q.correctLetters;
+                isWrong = !(
+                    correctLetters.length === userSelectedLetters.length && 
+                    correctLetters.every(letter => userSelectedLetters.includes(letter))
+                );
+            }
         } else {
             isWrong = userAnswer !== q.correctAnswer;
         }
 
-        if (!isWrong) return;
+        if (!isWrong || !userAnswer) return;
         
         wrongCount++;
         const wrongItem = document.createElement('div');
         wrongItem.className = 'wrong-item';
         
         // 格式化用户答案
-        const formattedUserAnswer = Array.isArray(userAnswer) ? userAnswer.join('、') : userAnswer;
+        const formattedUserAnswer = formatUserAnswer(userAnswer, q.type);
         
         // 构建错题项HTML
         wrongItem.innerHTML = `
@@ -444,85 +632,32 @@ function showWrongAnswers() {
     DOM.wrongCount.textContent = wrongCount;
 }
 
-// 获取题目类型文本
+// 辅助函数：格式化用户答案
+function formatUserAnswer(answer, type) {
+    if (!answer) return '未作答';
+    return Array.isArray(answer) ? answer.join('、') : answer;
+}
+
+// 辅助函数：比较数组是否相等
+function arraysEqual(a, b) {
+    if (a === b) return true;
+    if (!Array.isArray(a) || !Array.isArray(b)) return false;
+    if (a.length !== b.length) return false;
+    
+    const sortedA = [...a].sort();
+    const sortedB = [...b].sort();
+    return sortedA.every((val, i) => val === sortedB[i]);
+}
+
+// 辅助函数：获取题型文本
 function getQuestionTypeText(type) {
-    switch (type) {
-        case 'single_choice':
-            return '单选题';
-        case 'multiple_choice':
-            return '多选题';
-        case 'true_false':
-            return '判断题';
-        default:
-            return '';
-    }
+    const types = {
+        'single_choice': '单选题',
+        'multiple_choice': '多选题',
+        'true_false': '判断题'
+    };
+    return types[type] || '';
 }
 
-// 开始计时
-function startTimer() {
-    const timerDisplay = document.createElement('div');
-    timerDisplay.id = 'timer-display';
-    document.body.appendChild(timerDisplay);
-
-    AppState.examTimer = setInterval(() => {
-        AppState.examTimeLeft--;
-        if (AppState.examTimeLeft <= 0) {
-            clearInterval(AppState.examTimer);
-            handleSubmit();
-        }
-
-        const minutes = Math.floor(AppState.examTimeLeft / 60);
-        const seconds = AppState.examTimeLeft % 60;
-        timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-
-        if (AppState.examTimeLeft <= 60) {
-            timerDisplay.classList.add('blink');
-        }
-    }, 1000);
-}
-
-// 更新UI状态
-function updateUIState() {
-    DOM.submitBtn.disabled = !AppState.canSubmit;
-}
-
-// 初始化
-function init() {
-    fetch('exam.json')
-      .then(response => response.json())
-      .then(data => {
-            try {
-                if (validateExamData(data)) {
-                    AppState.examData = data;
-                    AppState.initialized = true;
-                }
-            } catch (error) {
-                document.getElementById('error-message').classList.remove('hidden');
-                document.getElementById('error-message').textContent = error.message;
-            }
-        })
-      .catch(error => {
-            document.getElementById('error-message').classList.remove('hidden');
-            document.getElementById('error-message').textContent = '加载题库失败: ' + error.message;
-        });
-
-    document.getElementById('start-btn').addEventListener('click', startExam);
-    DOM.answerSheetBtn.addEventListener('click', () => {
-        DOM.examScreen.classList.add('hidden');
-        DOM.answerSheetScreen.classList.remove('hidden');
-    });
-    DOM.backToExamBtn.addEventListener('click', () => {
-        DOM.answerSheetScreen.classList.add('hidden');
-        DOM.examScreen.classList.remove('hidden');
-        showCurrentQuestion();
-    });
-    DOM.submitBtn.addEventListener('click', handleSubmit);
-    DOM.viewWrongBtn.addEventListener('click', showWrongAnswers);
-    DOM.newExamBtn.addEventListener('click', startExam);
-    DOM.backToResultBtn.addEventListener('click', () => {
-        DOM.wrongAnswersScreen.classList.add('hidden');
-        DOM.resultScreen.classList.remove('hidden');
-    });
-}
-
-init();
+// 启动应用
+document.addEventListener('DOMContentLoaded', initApp);
