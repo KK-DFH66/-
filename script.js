@@ -220,25 +220,40 @@ function generateRandomExam() {
         .sort(() => Math.random() - 0.5)
         .slice(0, 100)
         .map(q => {
-            // 提取选项内容（去掉字母）
-            const optionContents = q.options.map(o => o.split("、")[1]);
-            // 打乱内容顺序
-            const shuffledContents = [...optionContents].sort(() => Math.random() - 0.5);
-            // 固定字母标签顺序（A/B/C/D）
-            const shuffledOptions = ['A', 'B', 'C', 'D'].slice(0, q.options.length)
-                .map((letter, index) => `${letter}、${shuffledContents[index]}`);
+            // 1. 提取选项内容（保留完整文本）
+            const optionsWithText = q.options.map(opt => {
+                const [letter, ...textParts] = opt.split("、");
+                return {
+                    letter,
+                    text: textParts.join("、") // 合并剩余部分
+                };
+            });
+
+            // 2. 打乱选项内容（不改变字母标签）
+            const shuffledTexts = [...optionsWithText]
+                .sort(() => Math.random() - 0.5)
+                .map(item => item.text);
+
+            // 3. 固定字母标签（A/B/C/D），绑定随机内容
+            const shuffledOptions = ['A', 'B', 'C', 'D']
+                .slice(0, q.options.length)
+                .map((letter, index) => `${letter}、${shuffledTexts[index]}`);
+
+            // 4. 动态绑定正确答案
+            const originalAnswerText = q.options
+                .find(opt => opt.startsWith(q.answer))
+                .split("、")
+                .slice(1)
+                .join("、");
             
-            // 动态绑定正确答案
-            const originalCorrectText = q.options.find(opt => 
-                opt.startsWith(q.answer)).split("、")[1];
             const correctAnswer = shuffledOptions.find(opt => 
-                opt.endsWith(originalCorrectText));
+                opt.endsWith(originalAnswerText));
 
             return {
                 ...q,
                 type: 'single_choice',
-                shuffledOptions,  // 字母固定但内容随机
-                correctAnswer,    // 动态绑定到新位置
+                shuffledOptions,
+                correctAnswer,
                 displayAnswer: correctAnswer
             };
         });
