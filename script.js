@@ -6,7 +6,7 @@ const AppState = {
     userAnswers: [],
     score: 0,
     examTimer: null,
-    examTimeLeft: 90 * 60, // 90分钟考试时间
+    examTimeLeft: 90 * 60,
     canSubmit: false,
     isMobile: /Mobi|Android/i.test(navigator.userAgent),
     initialized: false,
@@ -211,7 +211,7 @@ function resetExamState() {
     updateUIState();
 }
 
-// 生成随机试卷（核心函数）
+// 生成随机试卷（核心修改部分）
 function generateRandomExam() {
     AppState.currentExam = [];
     
@@ -220,17 +220,27 @@ function generateRandomExam() {
         .sort(() => Math.random() - 0.5)
         .slice(0, 100)
         .map(q => {
-            const optionsWithKeys = q.options.map(o => ({
-                letter: o.split("、")[0],
-                text: o
-            }));
-            const shuffled = shuffleOptions(optionsWithKeys);
-            const correctAnswer = shuffled.find(o => o.letter === q.answer).text;
+            // 提取纯选项内容（去掉字母）
+            const optionTexts = q.options.map(o => o.split("、")[1]);
+            
+            // 打乱内容（不包含字母）
+            const shuffledTexts = [...optionTexts].sort(() => Math.random() - 0.5);
+            
+            // 固定字母标签顺序（A/B/C/D）
+            const shuffledOptions = ['A', 'B', 'C', 'D'].map((letter, index) => {
+                return `${letter}、${shuffledTexts[index]}`;
+            });
+
+            // 动态绑定正确答案
+            const originalCorrectText = q.options.find(opt => 
+                opt.startsWith(q.answer)).split("、")[1];
+            const correctAnswer = shuffledOptions.find(opt => 
+                opt.endsWith(originalCorrectText));
 
             return {
                 ...q,
                 type: 'single_choice',
-                shuffledOptions: shuffled.map(o => o.text),
+                shuffledOptions,
                 correctAnswer,
                 displayAnswer: correctAnswer
             };
@@ -241,22 +251,29 @@ function generateRandomExam() {
         .sort(() => Math.random() - 0.5)
         .slice(0, 20)
         .map(q => {
-            const optionsWithKeys = q.options.map(o => ({
-                letter: o.split("、")[0],
-                text: o
-            }));
-            const shuffled = shuffleOptions(optionsWithKeys);
-            const correctAnswers = q.answer.map(a => 
-                shuffled.find(o => o.letter === a).text
-            );
+            const optionTexts = q.options.map(o => o.split("、")[1]);
+            const shuffledTexts = [...optionTexts].sort(() => Math.random() - 0.5);
+            
+            // 根据选项数量动态生成字母（支持A-E）
+            const letters = ['A', 'B', 'C', 'D', 'E'].slice(0, q.options.length);
+            const shuffledOptions = letters.map((letter, index) => 
+                `${letter}、${shuffledTexts[index]}`);
+
+            // 保存原始正确答案内容
+            const originalCorrectTexts = q.answer.map(a => 
+                q.options.find(opt => opt.startsWith(a)).split("、")[1]);
+            
+            // 动态绑定新选项中的正确答案
+            const correctAnswers = shuffledOptions.filter(opt => 
+                originalCorrectTexts.some(text => opt.endsWith(text)));
 
             return {
                 ...q,
                 type: 'multiple_choice',
-                shuffledOptions: shuffled.map(o => o.text),
+                shuffledOptions,
                 correctAnswer: correctAnswers,
                 displayAnswer: correctAnswers.join('、'),
-                correctLetters: q.answer // 保存原始正确字母
+                correctLetters: q.answer // 保留原始字母用于评分
             };
         });
 
@@ -274,16 +291,6 @@ function generateRandomExam() {
 
     AppState.currentExam = [...singleChoices, ...multiChoices, ...judgments];
     AppState.userAnswers = new Array(AppState.currentExam.length).fill(null);
-}
-
-// 打乱选项顺序
-function shuffleOptions(options) {
-    const arr = [...options];
-    for (let i = arr.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [arr[i], arr[j]] = [arr[j], arr[i]];
-    }
-    return arr;
 }
 
 // 显示当前题目
@@ -502,22 +509,16 @@ function calculateScore() {
         else if (q.type === 'multiple_choice') {
             if (!Array.isArray(userAnswer)) return;
             
-            // 获取用户选择的字母
-            const userSelectedLetters = userAnswer.map(ans => {
-                return ans.split("、")[0]; // 提取选项字母
-            });
-            
-            // 比较用户选择的字母和正确答案字母
+            // 通过字母比对（而非选项内容）
+            const userSelectedLetters = userAnswer.map(ans => ans.split("、")[0]);
             const correctLetters = q.correctLetters;
-            const correctCount = correctLetters.filter(letter => 
-                userSelectedLetters.includes(letter)).length;
             
-            if (correctCount === correctLetters.length && 
-                userSelectedLetters.length === correctLetters.length) {
-                // 完全正确
+            // 完全正确（所有正确选项选中且无多余选项）
+            if (arraysEqual(userSelectedLetters.sort(), correctLetters.sort())) {
                 multiChoiceScore += 1;
-            } else if (correctCount > 0) {
-                // 部分正确
+            } 
+            // 部分正确（选中部分正确选项）
+            else if (correctLetters.some(letter => userSelectedLetters.includes(letter))) {
                 multiChoiceScore += 0.5;
             }
         } 
