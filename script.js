@@ -211,35 +211,28 @@ function resetExamState() {
     updateUIState();
 }
 
-// 生成随机试卷（完整修正版）
+// 生成随机试卷
 function generateRandomExam() {
     AppState.currentExam = [];
     
-    // 处理单选题（字母固定+内容随机）
+    // 处理单选题（保持原有逻辑）
     const singleChoices = [...AppState.examData.single_choice]
         .sort(() => Math.random() - 0.5)
         .slice(0, 100)
         .map(q => {
-            // 1. 提取选项内容（保留完整文本）
             const optionsWithText = q.options.map(opt => {
                 const [letter, ...textParts] = opt.split("、");
-                return {
-                    letter,
-                    text: textParts.join("、") // 合并剩余部分
-                };
+                return { letter, text: textParts.join("、") };
             });
 
-            // 2. 打乱选项内容（不改变字母标签）
             const shuffledTexts = [...optionsWithText]
                 .sort(() => Math.random() - 0.5)
                 .map(item => item.text);
 
-            // 3. 固定字母标签（A/B/C/D），绑定随机内容
             const shuffledOptions = ['A', 'B', 'C', 'D']
                 .slice(0, q.options.length)
                 .map((letter, index) => `${letter}、${shuffledTexts[index]}`);
 
-            // 4. 动态绑定正确答案
             const originalAnswerText = q.options
                 .find(opt => opt.startsWith(q.answer))
                 .split("、")
@@ -258,33 +251,20 @@ function generateRandomExam() {
             };
         });
 
-    // 处理多选题
+    // 处理多选题（取消选项随机化）
     const multiChoices = [...AppState.examData.multiple_choice]
         .sort(() => Math.random() - 0.5)
         .slice(0, 20)
-        .map(q => {
-            const optionTexts = q.options.map(o => o.split("、")[1]);
-            const shuffledTexts = [...optionTexts].sort(() => Math.random() - 0.5);
-            const letters = ['A', 'B', 'C', 'D', 'E'].slice(0, q.options.length);
-            const shuffledOptions = letters.map((letter, index) => 
-                `${letter}、${shuffledTexts[index]}`);
+        .map(q => ({
+            ...q,
+            type: 'multiple_choice',
+            shuffledOptions: q.options, // 保持原始顺序
+            correctAnswer: q.answer.map(letter => 
+                q.options.find(opt => opt.startsWith(letter))),
+            correctLetters: q.answer
+        }));
 
-            const originalCorrectTexts = q.answer.map(a => 
-                q.options.find(opt => opt.startsWith(a)).split("、")[1]);
-            const correctAnswers = shuffledOptions.filter(opt => 
-                originalCorrectTexts.some(text => opt.endsWith(text)));
-
-            return {
-                ...q,
-                type: 'multiple_choice',
-                shuffledOptions,
-                correctAnswer: correctAnswers,
-                displayAnswer: correctAnswers.join('、'),
-                correctLetters: q.answer
-            };
-        });
-
-    // 处理判断题
+    // 处理判断题（保持原有逻辑）
     const judgments = [...AppState.examData.true_false]
         .sort(() => Math.random() - 0.5)
         .slice(0, 30)
@@ -505,15 +485,12 @@ function calculateScore() {
         else if (q.type === 'multiple_choice') {
             if (!Array.isArray(userAnswer)) return;
             
-            // 提取用户选择的选项字母并排序
-            const userSelectedLetters = userAnswer.map(ans => ans.split("、")[0]).sort();
-            const correctLetters = q.correctLetters.sort();
+            // 修复：按选项内容严格匹配（不再依赖字母）
+            const isCorrect = 
+                userAnswer.length === q.correctAnswer.length &&
+                userAnswer.every(opt => q.correctAnswer.includes(opt));
             
-            // 比较排序后的字母数组是否相同
-            if (userSelectedLetters.length === correctLetters.length && 
-                userSelectedLetters.every((val, index) => val === correctLetters[index])) {
-                multiChoiceScore += 1;
-            }
+            if (isCorrect) multiChoiceScore += 1;
         } 
         else if (q.type === 'true_false') {
             judgmentScore += (userAnswer === q.correctAnswer ? 1 : 0);
@@ -541,13 +518,11 @@ function updateScoreDetails() {
         else if (q.type === 'multiple_choice') {
             if (!Array.isArray(userAnswer)) return;
             
-            const userSelectedLetters = userAnswer.map(ans => ans.split("、")[0]).sort();
-            const correctLetters = q.correctLetters.sort();
+            const isCorrect = 
+                userAnswer.length === q.correctAnswer.length &&
+                userAnswer.every(opt => q.correctAnswer.includes(opt));
             
-            if (userSelectedLetters.length === correctLetters.length && 
-                userSelectedLetters.every((val, index) => val === correctLetters[index])) {
-                details.multiple_choice.score += 1;
-            }
+            if (isCorrect) details.multiple_choice.score += 1;
         }
         else if (q.type === 'true_false') {
             details.true_false.score += (userAnswer === q.correctAnswer ? 1 : 0);
@@ -583,11 +558,9 @@ function showWrongAnswers() {
             if (!Array.isArray(userAnswer)) {
                 isWrong = true;
             } else {
-                const userLetters = userAnswer.map(a => a.split("、")[0]).sort();
-                const correctLetters = q.correctLetters.sort();
                 isWrong = !(
-                    userLetters.length === correctLetters.length && 
-                    userLetters.every((val, i) => val === correctLetters[i])
+                    userAnswer.length === q.correctAnswer.length &&
+                    userAnswer.every(opt => q.correctAnswer.includes(opt))
                 );
             }
         } 
@@ -601,25 +574,11 @@ function showWrongAnswers() {
         const wrongItem = document.createElement('div');
         wrongItem.className = 'wrong-item';
         
-        // 格式化用户答案和正确答案显示
-        let formattedUserAnswer = '';
-        let formattedCorrectAnswer = '';
-        
-        if (q.type === 'multiple_choice') {
-            // 多选题：显示完整选项内容
-            formattedUserAnswer = Array.isArray(userAnswer) ? 
-                userAnswer.join('、') : userAnswer || '未作答';
-            
-            // 从题目中获取正确的完整选项内容
-            const correctOptions = q.correctLetters.map(letter => {
-                return q.options.find(opt => opt.startsWith(letter));
-            });
-            formattedCorrectAnswer = correctOptions.join('、');
-        } else {
-            // 单选题和判断题
-            formattedUserAnswer = userAnswer || '未作答';
-            formattedCorrectAnswer = q.displayAnswer;
-        }
+        // 格式化答案显示
+        let formattedUserAnswer = Array.isArray(userAnswer) ? 
+            userAnswer.join('、') : userAnswer;
+        let formattedCorrectAnswer = q.type === 'multiple_choice' ? 
+            q.correctAnswer.join('、') : q.displayAnswer;
         
         wrongItem.innerHTML = `
             <div class="wrong-question">
@@ -627,7 +586,7 @@ function showWrongAnswers() {
                 <p>${q.question}</p>
             </div>
             <div class="wrong-answer">
-                <p>你的答案: <span class="user-wrong">${formattedUserAnswer}</span></p>
+                <p>你的答案: <span class="user-wrong">${formattedUserAnswer || '未作答'}</span></p>
                 <p>正确答案: <span class="correct-answer">${formattedCorrectAnswer}</span></p>
             </div>
             ${q.explanation ? `<div class="explanation">解析: ${q.explanation}</div>` : ''}
