@@ -215,7 +215,7 @@ function resetExamState() {
 function generateRandomExam() {
     AppState.currentExam = [];
     
-    // 处理单选题（保持原有逻辑）
+    // 处理单选题
     const singleChoices = [...AppState.examData.single_choice]
         .sort(() => Math.random() - 0.5)
         .slice(0, 100)
@@ -251,20 +251,45 @@ function generateRandomExam() {
             };
         });
 
-    // 处理多选题（取消选项随机化）
+    // 处理多选题（已修改为完全随机化）
     const multiChoices = [...AppState.examData.multiple_choice]
         .sort(() => Math.random() - 0.5)
         .slice(0, 20)
-        .map(q => ({
-            ...q,
-            type: 'multiple_choice',
-            shuffledOptions: q.options, // 保持原始顺序
-            correctAnswer: q.answer.map(letter => 
-                q.options.find(opt => opt.startsWith(letter))),
-            correctLetters: q.answer
-        }));
+        .map(q => {
+            // 将选项和字母分离
+            const optionsWithText = q.options.map(opt => {
+                const [letter, ...textParts] = opt.split("、");
+                return { letter, text: textParts.join("、") };
+            });
 
-    // 处理判断题（保持原有逻辑）
+            // 随机排序选项内容（保持字母与内容对应）
+            const shuffledOptionsWithText = [...optionsWithText]
+                .sort(() => Math.random() - 0.5);
+
+            // 重新生成连续的选项标签（A、B、C...）
+            const shuffledOptions = shuffledOptionsWithText.map((item, index) => {
+                const newLetter = String.fromCharCode(65 + index); // A, B, C...
+                return `${newLetter}、${item.text}`;
+            });
+
+            // 映射原始正确答案到新标签
+            const correctAnswer = q.answer.map(originalLetter => {
+                const originalOption = optionsWithText.find(opt => opt.letter === originalLetter);
+                const newIndex = shuffledOptionsWithText.findIndex(opt => opt.text === originalOption.text);
+                const newLetter = String.fromCharCode(65 + newIndex);
+                return `${newLetter}、${originalOption.text}`;
+            });
+
+            return {
+                ...q,
+                type: 'multiple_choice',
+                shuffledOptions,
+                correctAnswer,
+                correctLetters: correctAnswer.map(opt => opt.split("、")[0])
+            };
+        });
+
+    // 处理判断题
     const judgments = [...AppState.examData.true_false]
         .sort(() => Math.random() - 0.5)
         .slice(0, 30)
@@ -485,10 +510,11 @@ function calculateScore() {
         else if (q.type === 'multiple_choice') {
             if (!Array.isArray(userAnswer)) return;
             
-            // 修复：按选项内容严格匹配（不再依赖字母）
+            // 严格的多选题评分逻辑
             const isCorrect = 
                 userAnswer.length === q.correctAnswer.length &&
-                userAnswer.every(opt => q.correctAnswer.includes(opt));
+                userAnswer.every(opt => q.correctAnswer.includes(opt)) &&
+                q.correctAnswer.every(opt => userAnswer.includes(opt));
             
             if (isCorrect) multiChoiceScore += 1;
         } 
@@ -520,7 +546,8 @@ function updateScoreDetails() {
             
             const isCorrect = 
                 userAnswer.length === q.correctAnswer.length &&
-                userAnswer.every(opt => q.correctAnswer.includes(opt));
+                userAnswer.every(opt => q.correctAnswer.includes(opt)) &&
+                q.correctAnswer.every(opt => userAnswer.includes(opt));
             
             if (isCorrect) details.multiple_choice.score += 1;
         }
@@ -560,7 +587,8 @@ function showWrongAnswers() {
             } else {
                 isWrong = !(
                     userAnswer.length === q.correctAnswer.length &&
-                    userAnswer.every(opt => q.correctAnswer.includes(opt))
+                    userAnswer.every(opt => q.correctAnswer.includes(opt)) &&
+                    q.correctAnswer.every(opt => userAnswer.includes(opt))
                 );
             }
         } 
