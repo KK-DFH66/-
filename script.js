@@ -211,7 +211,7 @@ function resetExamState() {
     updateUIState();
 }
 
-// 生成随机试卷（核心修改部分）
+// 生成随机试卷
 function generateRandomExam() {
     AppState.currentExam = [];
     
@@ -220,18 +220,12 @@ function generateRandomExam() {
         .sort(() => Math.random() - 0.5)
         .slice(0, 100)
         .map(q => {
-            // 提取纯选项内容（去掉字母）
             const optionTexts = q.options.map(o => o.split("、")[1]);
-            
-            // 打乱内容（不包含字母）
             const shuffledTexts = [...optionTexts].sort(() => Math.random() - 0.5);
-            
-            // 固定字母标签顺序（A/B/C/D）
             const shuffledOptions = ['A', 'B', 'C', 'D'].map((letter, index) => {
                 return `${letter}、${shuffledTexts[index]}`;
             });
 
-            // 动态绑定正确答案
             const originalCorrectText = q.options.find(opt => 
                 opt.startsWith(q.answer)).split("、")[1];
             const correctAnswer = shuffledOptions.find(opt => 
@@ -253,17 +247,12 @@ function generateRandomExam() {
         .map(q => {
             const optionTexts = q.options.map(o => o.split("、")[1]);
             const shuffledTexts = [...optionTexts].sort(() => Math.random() - 0.5);
-            
-            // 根据选项数量动态生成字母（支持A-E）
             const letters = ['A', 'B', 'C', 'D', 'E'].slice(0, q.options.length);
             const shuffledOptions = letters.map((letter, index) => 
                 `${letter}、${shuffledTexts[index]}`);
 
-            // 保存原始正确答案内容
             const originalCorrectTexts = q.answer.map(a => 
                 q.options.find(opt => opt.startsWith(a)).split("、")[1]);
-            
-            // 动态绑定新选项中的正确答案
             const correctAnswers = shuffledOptions.filter(opt => 
                 originalCorrectTexts.some(text => opt.endsWith(text)));
 
@@ -273,7 +262,7 @@ function generateRandomExam() {
                 shuffledOptions,
                 correctAnswer: correctAnswers,
                 displayAnswer: correctAnswers.join('、'),
-                correctLetters: q.answer // 保留原始字母用于评分
+                correctLetters: q.answer
             };
         });
 
@@ -298,11 +287,9 @@ function showCurrentQuestion() {
     const question = AppState.currentExam[AppState.currentQuestionIndex];
     const totalQuestions = AppState.currentExam.length;
     
-    // 更新进度条
     DOM.progressBar.style.width = `${(AppState.currentQuestionIndex + 1) / totalQuestions * 100}%`;
     DOM.progressText.textContent = `${AppState.currentQuestionIndex + 1}/${totalQuestions}`;
     
-    // 更新板块标题
     let sectionTitle = '';
     if (AppState.currentQuestionIndex < 100) {
         sectionTitle = '单选题板块 (1-100)';
@@ -313,19 +300,16 @@ function showCurrentQuestion() {
     }
     DOM.sectionTitle.textContent = sectionTitle;
     
-    // 显示题目信息
     DOM.questionType.textContent = question.type === 'single_choice' ? '单选题' : 
                                  question.type === 'multiple_choice' ? '多选题' : '判断题';
     DOM.questionText.textContent = `${AppState.currentQuestionIndex + 1}. ${question.question}`;
     
-    // 清空并重建选项
     DOM.optionsContainer.innerHTML = '';
     question.shuffledOptions.forEach(option => {
         const optionElement = document.createElement('div');
         optionElement.classList.add('option');
         optionElement.textContent = option;
         
-        // 设置选中状态
         if (question.type === 'multiple_choice') {
             if (Array.isArray(AppState.userAnswers[AppState.currentQuestionIndex])) {
                 optionElement.classList.toggle('selected', 
@@ -336,7 +320,6 @@ function showCurrentQuestion() {
                 AppState.userAnswers[AppState.currentQuestionIndex] === option);
         }
         
-        // 添加点击事件
         optionElement.addEventListener('click', () => selectOption(option));
         DOM.optionsContainer.appendChild(optionElement);
     });
@@ -405,7 +388,6 @@ function updateAnswerSheet() {
         sheetNumber.classList.add('sheet-number');
         sheetNumber.textContent = index + 1;
         
-        // 设置答题状态
         const isAnswered = question.type === 'multiple_choice' 
             ? Array.isArray(AppState.userAnswers[index]) && AppState.userAnswers[index].length > 0
             : AppState.userAnswers[index] !== null;
@@ -413,7 +395,6 @@ function updateAnswerSheet() {
         if (isAnswered) sheetNumber.classList.add('answered');
         if (index === AppState.currentQuestionIndex) sheetNumber.classList.add('current');
         
-        // 添加点击事件
         sheetNumber.addEventListener('click', () => {
             AppState.currentQuestionIndex = index;
             DOM.answerSheetScreen.classList.add('hidden');
@@ -421,7 +402,6 @@ function updateAnswerSheet() {
             showCurrentQuestion();
         });
         
-        // 添加到对应区域
         if (index < 100) {
             DOM.singleChoiceSheet.appendChild(sheetNumber);
         } else if (index < 120) {
@@ -451,7 +431,6 @@ function startTimer() {
         timerDisplay.textContent = timeString;
         sheetTimerDisplay.textContent = timeString;
         
-        // 最后5分钟闪烁提醒
         if (AppState.examTimeLeft <= 5 * 60) {
             timerDisplay.style.color = '#e74c3c';
             timerDisplay.classList.add('blink');
@@ -459,7 +438,6 @@ function startTimer() {
             sheetTimerDisplay.classList.add('blink');
         }
         
-        // 考试时间结束
         if (AppState.examTimeLeft <= 0) {
             clearInterval(AppState.examTimer);
             showResult();
@@ -493,7 +471,7 @@ function showResult() {
     updateScoreDetails();
 }
 
-// 计算分数
+// 计算分数（严格判分版本）
 function calculateScore() {
     let singleChoiceScore = 0;
     let multiChoiceScore = 0;
@@ -509,17 +487,15 @@ function calculateScore() {
         else if (q.type === 'multiple_choice') {
             if (!Array.isArray(userAnswer)) return;
             
-            // 通过字母比对（而非选项内容）
             const userSelectedLetters = userAnswer.map(ans => ans.split("、")[0]);
             const correctLetters = q.correctLetters;
             
-            // 完全正确（所有正确选项选中且无多余选项）
-            if (arraysEqual(userSelectedLetters.sort(), correctLetters.sort())) {
+            const userSorted = [...userSelectedLetters].sort();
+            const correctSorted = [...correctLetters].sort();
+            
+            if (userSorted.length === correctSorted.length && 
+                userSorted.every((val, index) => val === correctSorted[index])) {
                 multiChoiceScore += 1;
-            } 
-            // 部分正确（选中部分正确选项）
-            else if (correctLetters.some(letter => userSelectedLetters.includes(letter))) {
-                multiChoiceScore += 0.5;
             }
         } 
         else if (q.type === 'true_false') {
@@ -530,7 +506,7 @@ function calculateScore() {
     AppState.score = singleChoiceScore + multiChoiceScore + judgmentScore;
 }
 
-// 更新分数详情
+// 更新分数详情（严格判分版本）
 function updateScoreDetails() {
     const details = {
         'single_choice': { score: 0, max: 50 },
@@ -550,14 +526,13 @@ function updateScoreDetails() {
             
             const userSelectedLetters = userAnswer.map(ans => ans.split("、")[0]);
             const correctLetters = q.correctLetters;
-            const correctCount = correctLetters.filter(letter => 
-                userSelectedLetters.includes(letter)).length;
             
-            if (correctCount === correctLetters.length && 
-                userSelectedLetters.length === correctLetters.length) {
+            const userSorted = [...userSelectedLetters].sort();
+            const correctSorted = [...correctLetters].sort();
+            
+            if (userSorted.length === correctSorted.length && 
+                userSorted.every((val, index) => val === correctSorted[index])) {
                 details.multiple_choice.score += 1;
-            } else if (correctCount > 0) {
-                details.multiple_choice.score += 0.5;
             }
         }
         else if (q.type === 'true_false') {
@@ -565,7 +540,6 @@ function updateScoreDetails() {
         }
     });
 
-    // 更新UI
     Object.keys(details).forEach(type => {
         const typeKey = type.replace('_', '-');
         const progress = details[type].score / details[type].max * 100;
@@ -575,7 +549,7 @@ function updateScoreDetails() {
     });
 }
 
-// 显示错题解析
+// 显示错题解析（严格判分版本）
 function showWrongAnswers() {
     DOM.resultScreen.classList.add('hidden');
     DOM.wrongAnswersScreen.classList.remove('hidden');
@@ -588,21 +562,22 @@ function showWrongAnswers() {
         const userAnswer = AppState.userAnswers[idx];
         let isWrong = false;
 
-        // 判断是否答错
         if (q.type === 'single_choice') {
             isWrong = userAnswer !== q.correctAnswer;
-        } else if (q.type === 'multiple_choice') {
+        } 
+        else if (q.type === 'multiple_choice') {
             if (!Array.isArray(userAnswer)) {
                 isWrong = true;
             } else {
-                const userSelectedLetters = userAnswer.map(ans => ans.split("、")[0]);
-                const correctLetters = q.correctLetters;
+                const userLetters = userAnswer.map(a => a.split("、")[0]).sort();
+                const correctLetters = q.correctLetters.sort();
                 isWrong = !(
-                    correctLetters.length === userSelectedLetters.length && 
-                    correctLetters.every(letter => userSelectedLetters.includes(letter))
+                    userLetters.length === correctLetters.length && 
+                    userLetters.every((val, i) => val === correctLetters[i])
                 );
             }
-        } else {
+        } 
+        else {
             isWrong = userAnswer !== q.correctAnswer;
         }
 
@@ -612,17 +587,15 @@ function showWrongAnswers() {
         const wrongItem = document.createElement('div');
         wrongItem.className = 'wrong-item';
         
-        // 格式化用户答案
-        const formattedUserAnswer = formatUserAnswer(userAnswer, q.type);
-        
-        // 构建错题项HTML
         wrongItem.innerHTML = `
             <div class="wrong-question">
                 <strong>第${idx + 1}题 (${getQuestionTypeText(q.type)})</strong>
                 <p>${q.question}</p>
             </div>
             <div class="wrong-answer">
-                <p>你的答案: <span class="user-wrong">${formattedUserAnswer}</span></p>
+                <p>你的答案: <span class="user-wrong">${
+                    Array.isArray(userAnswer) ? userAnswer.join('、') : userAnswer || '未作答'
+                }</span></p>
                 <p>正确答案: <span class="correct-answer">${q.displayAnswer}</span></p>
             </div>
             ${q.explanation ? `<div class="explanation">解析: ${q.explanation}</div>` : ''}
@@ -631,23 +604,6 @@ function showWrongAnswers() {
     });
 
     DOM.wrongCount.textContent = wrongCount;
-}
-
-// 辅助函数：格式化用户答案
-function formatUserAnswer(answer, type) {
-    if (!answer) return '未作答';
-    return Array.isArray(answer) ? answer.join('、') : answer;
-}
-
-// 辅助函数：比较数组是否相等
-function arraysEqual(a, b) {
-    if (a === b) return true;
-    if (!Array.isArray(a) || !Array.isArray(b)) return false;
-    if (a.length !== b.length) return false;
-    
-    const sortedA = [...a].sort();
-    const sortedB = [...b].sort();
-    return sortedA.every((val, i) => val === sortedB[i]);
 }
 
 // 辅助函数：获取题型文本
