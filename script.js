@@ -211,7 +211,7 @@ function resetExamState() {
     updateUIState();
 }
 
-// 生成随机试卷（最终修正版）
+// 生成随机试卷（修正版）
 function generateRandomExam() {
     AppState.currentExam = [];
     
@@ -220,58 +220,71 @@ function generateRandomExam() {
         .sort(() => Math.random() - 0.5)
         .slice(0, 100)
         .map(q => {
-            // 提取选项内容（去掉字母）
-            const optionContents = q.options.map(o => o.split("、")[1]);
+            // 创建字母到内容的映射
+            const optionMap = {};
+            q.options.forEach(opt => {
+                const [letter, content] = opt.split("、");
+                optionMap[letter] = content;
+            });
             
-            // 打乱内容顺序
+            // 提取选项内容并随机排序
+            const optionContents = Object.values(optionMap);
             const shuffledContents = [...optionContents].sort(() => Math.random() - 0.5);
             
-            // 固定字母标签顺序（A/B/C/D）
-            const shuffledOptions = ['A', 'B', 'C', 'D'].slice(0, q.options.length)
-                .map((letter, index) => `${letter}、${shuffledContents[index]}`);
+            // 固定字母顺序（A/B/C/D）
+            const letters = ['A', 'B', 'C', 'D'].slice(0, q.options.length);
+            const shuffledOptions = letters.map((letter, index) => 
+                `${letter}、${shuffledContents[index]}`);
             
-            // 动态绑定正确答案
-            const originalCorrectText = q.options.find(opt => 
-                opt.startsWith(q.answer)).split("、")[1];
-            const correctAnswer = shuffledOptions.find(opt => 
-                opt.endsWith(originalCorrectText));
+            // 获取原始正确答案内容
+            const correctContent = optionMap[q.answer];
+            
+            // 匹配新位置上的正确答案
+            const correctOption = shuffledOptions.find(opt => 
+                opt.endsWith(correctContent));
 
             return {
                 ...q,
                 type: 'single_choice',
-                shuffledOptions,  // 字母固定但内容随机
-                correctAnswer,    // 动态绑定到新位置
-                displayAnswer: correctAnswer
+                shuffledOptions,
+                correctAnswer: correctOption,
+                displayAnswer: correctOption,
+                originalAnswer: q.answer // 保留原始答案字母
             };
         });
 
-    // 处理多选题
+    // 处理多选题（同样逻辑）
     const multiChoices = [...AppState.examData.multiple_choice]
         .sort(() => Math.random() - 0.5)
         .slice(0, 20)
         .map(q => {
-            const optionTexts = q.options.map(o => o.split("、")[1]);
-            const shuffledTexts = [...optionTexts].sort(() => Math.random() - 0.5);
+            const optionMap = {};
+            q.options.forEach(opt => {
+                const [letter, content] = opt.split("、");
+                optionMap[letter] = content;
+            });
+            
+            const optionContents = Object.values(optionMap);
+            const shuffledContents = [...optionContents].sort(() => Math.random() - 0.5);
             const letters = ['A', 'B', 'C', 'D', 'E'].slice(0, q.options.length);
             const shuffledOptions = letters.map((letter, index) => 
                 `${letter}、${shuffledTexts[index]}`);
-
-            const originalCorrectTexts = q.answer.map(a => 
-                q.options.find(opt => opt.startsWith(a)).split("、")[1]);
-            const correctAnswers = shuffledOptions.filter(opt => 
-                originalCorrectTexts.some(text => opt.endsWith(text)));
+            
+            const correctContents = q.answer.map(a => optionMap[a]);
+            const correctOptions = shuffledOptions.filter(opt => 
+                correctContents.some(text => opt.endsWith(text)));
 
             return {
                 ...q,
                 type: 'multiple_choice',
                 shuffledOptions,
-                correctAnswer: correctAnswers,
-                displayAnswer: correctAnswers.join('、'),
+                correctAnswer: correctOptions,
+                displayAnswer: correctOptions.join('、'),
                 correctLetters: q.answer
             };
         });
 
-    // 处理判断题
+    // 处理判断题（无需修改）
     const judgments = [...AppState.examData.true_false]
         .sort(() => Math.random() - 0.5)
         .slice(0, 30)
@@ -355,7 +368,7 @@ function selectOption(selectedOption) {
     updateAnswerSheet();
 }
 
-// 显示上一题
+// 显示上一题/下一题（保持不变）
 function showPreviousQuestion() {
     if (AppState.currentQuestionIndex > 0) {
         AppState.currentQuestionIndex--;
@@ -363,7 +376,6 @@ function showPreviousQuestion() {
     }
 }
 
-// 显示下一题
 function showNextQuestion() {
     if (AppState.currentQuestionIndex < AppState.currentExam.length - 1) {
         AppState.currentQuestionIndex++;
