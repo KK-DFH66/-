@@ -194,7 +194,7 @@ function startExam() {
     setTimeout(() => {
         AppState.canSubmit = true;
         updateUIState();
-    }, 5 * 60 * 1000);
+    }, 2 * 60 * 1000);
     
     startTimer();
     showCurrentQuestion();
@@ -211,31 +211,28 @@ function resetExamState() {
     updateUIState();
 }
 
-// 生成随机试卷
+// 生成随机试卷（修正后的版本）
 function generateRandomExam() {
     AppState.currentExam = [];
     
-    // 处理单选题
+    // 处理单选题（修正部分）
     const singleChoices = [...AppState.examData.single_choice]
         .sort(() => Math.random() - 0.5)
         .slice(0, 100)
         .map(q => {
-            const optionTexts = q.options.map(o => o.split("、")[1]);
-            const shuffledTexts = [...optionTexts].sort(() => Math.random() - 0.5);
-            const shuffledOptions = ['A', 'B', 'C', 'D'].map((letter, index) => {
-                return `${letter}、${shuffledTexts[index]}`;
-            });
-
-            const originalCorrectText = q.options.find(opt => 
-                opt.startsWith(q.answer)).split("、")[1];
-            const correctAnswer = shuffledOptions.find(opt => 
-                opt.endsWith(originalCorrectText));
-
+            // 创建选项副本并随机排序
+            const optionsCopy = [...q.options];
+            const shuffledOptions = optionsCopy.sort(() => Math.random() - 0.5);
+            
+            // 查找新位置中的正确答案
+            const correctAnswer = shuffledOptions.find(option => 
+                option.startsWith(q.answer + "、"));
+            
             return {
                 ...q,
                 type: 'single_choice',
-                shuffledOptions,
-                correctAnswer,
+                shuffledOptions,  // 随机排序但完整的选项
+                correctAnswer,    // 新位置的正确答案
                 displayAnswer: correctAnswer
             };
         });
@@ -448,7 +445,7 @@ function startTimer() {
 // 处理交卷
 function handleSubmit() {
     if (!AppState.canSubmit) {
-        alert('考试开始5分钟后才能交卷！');
+        alert('考试开始2分钟后才能交卷！');
         return;
     }
     showResult();
@@ -471,7 +468,7 @@ function showResult() {
     updateScoreDetails();
 }
 
-// 计算分数（严格判分版本）
+// 计算分数
 function calculateScore() {
     let singleChoiceScore = 0;
     let multiChoiceScore = 0;
@@ -506,7 +503,7 @@ function calculateScore() {
     AppState.score = singleChoiceScore + multiChoiceScore + judgmentScore;
 }
 
-// 更新分数详情（严格判分版本）
+// 更新分数详情
 function updateScoreDetails() {
     const details = {
         'single_choice': { score: 0, max: 50 },
@@ -549,7 +546,7 @@ function updateScoreDetails() {
     });
 }
 
-// 显示错题解析（严格判分版本）
+// 显示错题解析
 function showWrongAnswers() {
     DOM.resultScreen.classList.add('hidden');
     DOM.wrongAnswersScreen.classList.remove('hidden');
